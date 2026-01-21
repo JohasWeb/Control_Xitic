@@ -1,9 +1,63 @@
 <?php
 // View/AdminMaster/Clientes/ver.php
 include 'View/layouts/header_admin.php';
+$CsrfToken = SecurityController::obtenerCsrfToken();
 ?>
 
 <div class="page-wrapper anime-fade-in">
+    <!-- ... (resto del código sin cambios hasta el modal) ... -->
+    
+<!-- MODAL EDICIÓN -->
+<div class="modal fade" id="modalEditarCliente" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Editar Cliente</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <form action="index.php?System=clientes&a=guardar" method="POST" autocomplete="off" enctype="multipart/form-data">
+                <input type="hidden" name="csrf_token" value="<?php echo $CsrfToken; ?>">
+                <input type="hidden" name="id" value="<?php echo $Cliente['id']; ?>">
+                
+                <!-- Campos ocultos requeridos por validación de guardar() pero que no se editan aquí (Admin) -->
+                <input type="hidden" name="admin_nombre" value="N/A">
+                <input type="hidden" name="admin_apellido" value="N/A">
+                <input type="hidden" name="email_admin" value="placeholder@xitic.com">
+
+                <div class="modal-body pt-4">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Nombre Comercial</label>
+                        <input type="text" class="form-control bg-light border-0" name="nombre_comercial" required value="<?php echo htmlspecialchars($Cliente['nombre_comercial']); ?>">
+                    </div>
+
+                    <div class="mb-3">
+                         <label class="form-label small fw-bold text-muted">Logo (Opcional - Reemplazar)</label>
+                         <input type="file" class="form-control bg-light border-0" name="logo" accept="image/*">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Comentarios</label>
+                        <textarea class="form-control bg-light border-0" name="comentarios" rows="2"><?php echo htmlspecialchars($Cliente['comentarios'] ?? ''); ?></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-danger">Límite de Sucursales</label>
+                        <input type="number" class="form-control bg-light border-0" name="limite_sucursales" min="0" value="<?php echo (int)$Cliente['limite_sucursales']; ?>">
+                        <div class="form-text extra-small">0 = Ilimitadas.</div>
+                    </div>
+                </div>
+                
+                <div class="modal-footer border-0 pt-0">
+                    <button type="button" class="btn btn-link text-muted text-decoration-none small" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold" style="background:var(--accent);border:none;">
+                        <i class="bi bi-save me-2"></i>Guardar Cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
     <!-- Header: Breadcrumb + Título -->
     <div class="mb-4">
         <nav aria-label="breadcrumb">
@@ -35,6 +89,12 @@ include 'View/layouts/header_admin.php';
                     <span class="text-muted extra-small">ID: #<?php echo str_pad((string)$Cliente['id'], 4, '0', STR_PAD_LEFT); ?></span>
                 </div>
             </div>
+            
+            <div class="ms-auto">
+                <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEditarCliente">
+                    <i class="bi bi-pencil me-1"></i>Editar
+                </button>
+            </div>
         </div>
     </div>
 
@@ -55,6 +115,18 @@ include 'View/layouts/header_admin.php';
                     <div class="text-dark">
                         <i class="bi bi-calendar3 me-1 text-muted"></i>
                         <?php echo date('d/m/Y', strtotime($Cliente['fecha_registro'])); ?>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="d-block text-muted extra-small fw-bold mb-1">
+                        Límite Sucursales
+                        <a href="#" class="text-decoration-none ms-1" data-bs-toggle="modal" data-bs-target="#modalEditarCliente" title="Editar Límite">
+                            <i class="bi bi-pencil-square small"></i>
+                        </a>
+                    </label>
+                    <div class="fs-5 fw-bold <?php echo ($Cliente['limite_sucursales'] > 0) ? 'text-danger' : 'text-success'; ?>">
+                        <?php echo ($Cliente['limite_sucursales'] > 0) ? $Cliente['limite_sucursales'] : 'Ilimitadas'; ?>
                     </div>
                 </div>
 
@@ -112,5 +184,42 @@ include 'View/layouts/header_admin.php';
         </div>
     </div>
 </div>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('#modalEditarCliente form');
+    if(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const btn = form.querySelector('button[type="submit"]');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = 'Guardando...';
+
+            fetch(form.action, {
+                method: 'POST',
+                body: new FormData(form)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.success) {
+                    location.reload();
+                } else {
+                    alert('Error: ' + data.message);
+                    btn.disabled = false;
+                    btn.innerHTML = originalText;
+                }
+            })
+            .catch(err => {
+                alert('Error de conexión');
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            });
+        });
+    }
+});
+</script>
 
 <?php include 'View/layouts/footer.php'; ?>

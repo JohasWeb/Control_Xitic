@@ -140,6 +140,11 @@ $Csrf = SecurityController::obtenerCsrfToken();
                             <label class="form-label small fw-bold text-muted">Comentarios / Notas</label>
                             <textarea class="form-control bg-light border-0" name="comentarios" rows="2" placeholder="Notas internas sobre este cliente..."></textarea>
                         </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-danger">Límite de Sucursales</label>
+                            <input type="number" class="form-control bg-light border-0" name="limite_sucursales" value="1" min="0">
+                            <div class="form-text extra-small">Introduce 0 para sucursales ilimitadas. (Default: 1)</div>
+                        </div>
                     </div>
 
                     <hr class="border-light my-4">

@@ -35,18 +35,26 @@ class ClientesModel
         }
     }
 
-    public function crear($NombreComercial, $RazonSocial, $Comentarios, $LogoUrl = null)
+    public function crear($NombreComercial, $RazonSocial, $Comentarios, $LogoUrl = null, $LimiteSucursales = 1)
     {
         try {
-            $Sql = "INSERT INTO clientes (nombre_comercial, razon_social, comentarios, logo_url, activo) VALUES (:nombre, :razon, :comentarios, :logo, 1)";
+            $Sql = "INSERT INTO clientes (nombre_comercial, razon_social, comentarios, logo_url, limite_sucursales, activo) VALUES (:nombre, :razon, :comentarios, :logo, :limite, 1)";
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':nombre', trim($NombreComercial ?? ''));
             $Stmt->bindValue(':razon', trim($RazonSocial ?? ''));
             $Stmt->bindValue(':comentarios', trim($Comentarios ?? ''));
             $Stmt->bindValue(':logo', $LogoUrl);
+            $Stmt->bindValue(':limite', (int)$LimiteSucursales, PDO::PARAM_INT);
             
             if ($Stmt->execute()) {
-                return $this->pdo->lastInsertId();
+                $NewId = $this->pdo->lastInsertId();
+                // Automatización: Región por defecto
+                $SqlR = "INSERT INTO regiones (cliente_id, nombre, activo) VALUES (:cid, 'Región 1', 1)";
+                $StmtR = $this->pdo->prepare($SqlR);
+                $StmtR->bindValue(':cid', $NewId, PDO::PARAM_INT);
+                $StmtR->execute();
+
+                return $NewId;
             }
             return false;
         } catch (Exception $e) {
@@ -54,11 +62,15 @@ class ClientesModel
         }
     }
 
-    public function actualizar($id, $NombreComercial, $RazonSocial, $Comentarios, $LogoUrl = null)
+    public function actualizar($id, $NombreComercial, $RazonSocial, $Comentarios, $LogoUrl = null, $LimiteSucursales = null)
     {
         try {
             $Sql = "UPDATE clientes SET nombre_comercial = :nombre, razon_social = :razon, comentarios = :comentarios";
             
+            if ($LimiteSucursales !== null) {
+                $Sql .= ", limite_sucursales = :limite";
+            }
+
             // Solo actualizamos el logo si viene uno nuevo
             if ($LogoUrl !== null) {
                 $Sql .= ", logo_url = :logo";
@@ -67,9 +79,14 @@ class ClientesModel
             $Sql .= " WHERE id = :id";
             
             $Stmt = $this->pdo->prepare($Sql);
-            $Stmt->bindValue(':nombre', trim($NombreComercial));
-            $Stmt->bindValue(':razon', trim($RazonSocial));
-            $Stmt->bindValue(':comentarios', trim($Comentarios));
+            $Stmt->bindValue(':nombre', trim($NombreComercial ?? ''));
+            $Stmt->bindValue(':razon', trim($RazonSocial ?? ''));
+            $Stmt->bindValue(':comentarios', trim($Comentarios ?? ''));
+            
+            if ($LimiteSucursales !== null) {
+                 $Stmt->bindValue(':limite', (int)$LimiteSucursales, PDO::PARAM_INT);
+            }
+
             $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
             
             if ($LogoUrl !== null) {

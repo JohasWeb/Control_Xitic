@@ -19,11 +19,12 @@ class EncuestasController
         // Si es AdminMaster ve todo, si no, solo lo de su cliente
         $ClienteId = null;
         if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1) {
-            $ClienteId = SecurityController::obtenerClienteIdSesion(); // Implementar esto en Security si no existe, o usar session
+            $Security = new SecurityController();
+            $ClienteId = $Security->obtenerClienteIdSesion();
         }
 
         $Encuestas = $this->model->listarEncuestas($ClienteId);
-        include_once "View/Encuestas/index.php";
+        include_once "View/ClienteAdmin/Encuestas/index.php";
     }
 
     public function crear()
@@ -33,7 +34,7 @@ class EncuestasController
         $ClientesModel = new ClientesModel();
         $Clientes = $ClientesModel->listarClientes(); // Para el select
 
-        include_once "View/Encuestas/crear.php";
+        include_once "View/ClienteAdmin/Encuestas/crear.php";
     }
 
     public function guardar()
@@ -45,11 +46,15 @@ class EncuestasController
                 die("Token de seguridad inválido.");
             }
 
-            $ClienteId = (int)$_POST['cliente_id'];
+            $Security = new SecurityController();
+            $ClienteId = $Security->obtenerClienteIdSesion();
+
             $Titulo = $_POST['titulo'];
-            $Descripcion = $_POST['descripcion'];
-            $FechaInicio = $_POST['fecha_inicio'];
-            $FechaFin = $_POST['fecha_fin'];
+            $Descripcion = isset($_POST['descripcion']) ? $_POST['descripcion'] : '';
+            $FechaInicio = isset($_POST['fecha_inicio']) ? $_POST['fecha_inicio'] : date('Y-m-d');
+            $FechaFin = isset($_POST['fecha_fin']) ? $_POST['fecha_fin'] : date('Y-m-d', strtotime('+1 month'));
+            $Anonima = isset($_POST['anonima']) ? (int)$_POST['anonima'] : 0;
+            $TiempoEstimado = isset($_POST['tiempo_estimado']) ? (int)$_POST['tiempo_estimado'] : 5;
             
             // 1. Crear la cabecera
             $UsuarioId = (int)$_SESSION['usuario_id']; // Asegurar que usuario_id esté en sesión
@@ -58,7 +63,7 @@ class EncuestasController
 
             $Creador = isset($_SESSION["_AdminID_user"]) ? $_SESSION["_AdminID_user"] : 1;
 
-            $EncuestaId = $this->model->crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $Creador);
+            $EncuestaId = $this->model->crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $Creador, $Anonima, $TiempoEstimado);
 
             if ($EncuestaId) {
                 // 2. Procesar preguntas dinámicas

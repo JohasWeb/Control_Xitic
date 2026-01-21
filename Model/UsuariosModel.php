@@ -56,8 +56,33 @@ class UsuariosModel
             return $this->pdo->lastInsertId();
 
         } catch (PDOException $e) {
-            // Log del error real internamente si fuera necesario
             throw new Exception("Error BD: " . $e->getMessage());
+        }
+    }
+
+    /**
+     * Obtiene los usuarios activos de un cliente (para selectores)
+     */
+    public function obtenerPorCliente($ClienteId)
+    {
+        try {
+            $Sql = "SELECT id, nombre, apellido, email, rol FROM usuarios WHERE cliente_id = ? AND estado = 'Activo' ORDER BY nombre ASC";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->execute([$ClienteId]);
+            return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return [];
+        }
+    }
+
+    public function buscarPorEmail($Email)
+    {
+        try {
+            $stmt = $this->pdo->prepare("SELECT * FROM usuarios WHERE email = ? LIMIT 1");
+            $stmt->execute([$Email]);
+            return $stmt->fetch(PDO::FETCH_ASSOC);
+        } catch (PDOException $e) {
+            return false;
         }
     }
 }

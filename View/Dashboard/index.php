@@ -1,6 +1,10 @@
 <?php
 // View/Dashboard/index.php
-include 'View/layouts/header_admin.php'; // Asumimos que el header maneja la estructura HTML inicial
+if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1) {
+    include 'View/layouts/header_cliente.php';
+} else {
+    include 'View/layouts/header_admin.php'; 
+}
 ?>
 
 <div class="container-fluid py-4">
@@ -19,7 +23,7 @@ include 'View/layouts/header_admin.php'; // Asumimos que el header maneja la est
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <div class="bg-primary bg-opacity-10 text-primary rounded p-3 me-3">
-                            <i class="fa-solid fa-building fa-xl"></i>
+                            <i class="bi bi-building fs-4"></i>
                         </div>
                         <h5 class="card-title mb-0">Clientes</h5>
                     </div>
@@ -36,7 +40,7 @@ include 'View/layouts/header_admin.php'; // Asumimos que el header maneja la est
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <div class="bg-success bg-opacity-10 text-success rounded p-3 me-3">
-                            <i class="fa-solid fa-clipboard-question fa-xl"></i>
+                            <i class="bi bi-ui-checks-grid fs-4"></i>
                         </div>
                         <h5 class="card-title mb-0">Encuestas</h5>
                     </div>
@@ -52,7 +56,7 @@ include 'View/layouts/header_admin.php'; // Asumimos que el header maneja la est
                 <div class="card-body">
                     <div class="d-flex align-items-center mb-3">
                         <div class="bg-info bg-opacity-10 text-info rounded p-3 me-3">
-                            <i class="fa-solid fa-chart-pie fa-xl"></i>
+                            <i class="bi bi-bar-chart fs-4"></i>
                         </div>
                         <h5 class="card-title mb-0">Reportes</h5>
                     </div>
@@ -61,6 +65,24 @@ include 'View/layouts/header_admin.php'; // Asumimos que el header maneja la est
                 </div>
             </div>
         </div>
+        
+        <?php if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1): ?>
+        <!-- Tarjeta de Usuarios (Cliente) -->
+        <div class="col-md-6 col-lg-4">
+             <div class="card border-0 shadow-sm h-100">
+                <div class="card-body">
+                    <div class="d-flex align-items-center mb-3">
+                        <div class="bg-indigo-subtle text-indigo rounded p-3 me-3">
+                            <i class="bi bi-people fs-4"></i>
+                        </div>
+                        <h5 class="card-title mb-0">Mis Usuarios</h5>
+                    </div>
+                    <p class="card-text text-muted">Gestión de usuarios y permisos de mi cuenta.</p>
+                    <a href="index.php?System=usuarios" class="btn btn-outline-primary stretched-link">Gestionar</a>
+                </div>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </div>
 

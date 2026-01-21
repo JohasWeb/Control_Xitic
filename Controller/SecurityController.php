@@ -116,7 +116,7 @@ class SecurityController
      *
      * @return void
      */
-    public function exigirClienteAdmin()
+    public static function exigirClienteAdmin()
     {
         self::iniciarSesionSegura();
 

@@ -49,13 +49,13 @@ class EncuestasModel
         }
     }
 
-    public function crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $CreadoPor)
+    public function crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $CreadoPor, $Anonima = 0, $TiempoEstimado = 5)
     {
         try {
             $Sql = "INSERT INTO encuestas 
-                    (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, estado, creado_por) 
+                    (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, estado, creado_por, anonima, tiempo_estimado) 
                     VALUES 
-                    (:cliente_id, :titulo, :descripcion, :inicio, :fin, 1, :creado_por)";
+                    (:cliente_id, :titulo, :descripcion, :inicio, :fin, 1, :creado_por, :anonima, :tiempo_estimado)";
             
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':cliente_id', $ClienteId, PDO::PARAM_INT);
@@ -64,6 +64,8 @@ class EncuestasModel
             $Stmt->bindValue(':inicio', $FechaInicio);
             $Stmt->bindValue(':fin', $FechaFin);
             $Stmt->bindValue(':creado_por', $CreadoPor, PDO::PARAM_INT);
+            $Stmt->bindValue(':anonima', $Anonima, PDO::PARAM_INT);
+            $Stmt->bindValue(':tiempo_estimado', $TiempoEstimado, PDO::PARAM_INT);
 
             if ($Stmt->execute()) {
                 return $this->pdo->lastInsertId();

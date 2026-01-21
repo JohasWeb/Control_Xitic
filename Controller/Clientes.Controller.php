@@ -98,6 +98,9 @@ class ClientesController
         $AdminNombre = isset($_POST['admin_nombre']) ? trim($_POST['admin_nombre']) : '';
         $AdminApellido = isset($_POST['admin_apellido']) ? trim($_POST['admin_apellido']) : '';
         $EmailAdmin = isset($_POST['email_admin']) ? trim($_POST['email_admin']) : '';
+        
+        // Limite Sucursales
+        $LimiteSucursales = isset($_POST['limite_sucursales']) ? (int)$_POST['limite_sucursales'] : 0;
 
         // Validación
         if ($Nombre === '' || $AdminNombre === '' || $EmailAdmin === '') {
@@ -107,13 +110,17 @@ class ClientesController
         try {
             if ($Id > 0) {
                 // Edición
-                $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl);
-                $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl);
-                echo json_encode(['success' => true, 'message' => 'Cliente actualizado correctamente']);
+                $Resultado = $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl, $LimiteSucursales);
+                
+                if ($Resultado) {
+                    echo json_encode(['success' => true, 'message' => 'Cliente actualizado correctamente']);
+                } else {
+                    echo json_encode(['success' => false, 'message' => 'Error al actualizar datos.']);
+                }
                 exit;
             } else {
                 // Creación
-                $NuevoClienteId = $this->model->crear($Nombre, $Razon, $Comentarios, $LogoUrl);
+                $NuevoClienteId = $this->model->crear($Nombre, $Razon, $Comentarios, $LogoUrl, $LimiteSucursales);
 
                 if (!$NuevoClienteId) {
                     throw new Exception("No se pudo registrar el cliente en la base de datos.");
@@ -141,8 +148,6 @@ class ClientesController
                 
                 $NombreArchivo = "Credenciales_" . preg_replace('/[^a-zA-Z0-9]/', '_', $Nombre) . ".txt";
 
-                $NombreArchivo = "Credenciales_" . preg_replace('/[^a-zA-Z0-9]/', '_', $Nombre) . ".txt";
-
                 echo json_encode([
                     'success' => true,
                     'message' => 'Cliente creado correctamente',
@@ -154,7 +159,6 @@ class ClientesController
                 exit;
             }
 
-        } catch (Exception $e) {
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => 'Error al procesar: ' . $e->getMessage()]);
             exit;
