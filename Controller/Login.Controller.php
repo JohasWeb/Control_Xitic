@@ -56,12 +56,20 @@ class LoginController
 
     public function validar()
     {
+        // 1. Silenciar errores visuales para no romper el JSON
+        ini_set('display_errors', 0);
+        error_reporting(0);
+        
+        // 2. Iniciar buffer para capturar cualquier salida inesperada
+        ob_start();
+
         header('Content-Type: application/json; charset=utf-8');
 
         if (!isset($_SERVER['REQUEST_METHOD']) || $_SERVER['REQUEST_METHOD'] !== 'POST') {
+            ob_end_clean(); // Limpiar
             http_response_code(405);
             echo json_encode(array('success' => 0, 'mensaje' => 'Método no permitido'), JSON_UNESCAPED_UNICODE);
-            return;
+            exit;
         }
 
         $this->iniciarSesionSegura();
@@ -74,9 +82,10 @@ class LoginController
         $Token_sesion = (string) $_SESSION['_csrf_token'];
 
         if ($Token_enviado === '' || hash_equals($Token_sesion, $Token_enviado) === false) {
+            ob_end_clean();
             http_response_code(419);
             echo json_encode(array('success' => 0, 'mensaje' => 'Sesión inválida. Recarga e intenta de nuevo.'), JSON_UNESCAPED_UNICODE);
-            return;
+            exit;
         }
 
         $Email_texto = '';
@@ -90,26 +99,30 @@ class LoginController
         }
 
         if ($Email_texto === '' || strlen($Email_texto) > 100) {
+            ob_end_clean();
             echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
-            return;
+            exit;
         }
 
         if (!filter_var($Email_texto, FILTER_VALIDATE_EMAIL)) {
-            echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
-            return;
+            ob_end_clean();
+            echo json_encode(array('success' => 0, 'mensaje' => 'Formato de correo inválido.'), JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
         if ($Pass_texto === '' || strlen($Pass_texto) > 72) {
-            echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
-            return;
+            ob_end_clean();
+            echo json_encode(array('success' => 0, 'mensaje' => 'Contraseña inválida.'), JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
         try {
             $this->model->setEmail($Email_texto);
             $this->model->setContrasenia($Pass_texto);
         } catch (Exception $e) {
-            echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
-            return;
+            ob_end_clean();
+            echo json_encode(array('success' => 0, 'mensaje' => 'Datos inválidos.'), JSON_UNESCAPED_UNICODE);
+            exit;
         }
 
         $Acceso_ok = $this->model->validar();
@@ -119,8 +132,9 @@ class LoginController
             $Info = $this->model->getUsuarioSesion();
 
             if (!$Info) {
-                echo json_encode(array('success' => 0, 'mensaje' => 'Error interno.'), JSON_UNESCAPED_UNICODE);
-                return;
+                ob_end_clean();
+                echo json_encode(array('success' => 0, 'mensaje' => 'Error al obtener sesión.'), JSON_UNESCAPED_UNICODE);
+                exit;
             }
 
             session_regenerate_id(true);
@@ -137,37 +151,21 @@ class LoginController
 
             $_SESSION["_Cliente_id"] = $Cliente_id;
 
-
             $_SESSION["_Rol"] = $Info["Rol"];
             $_SESSION["_Perfil_user_general"] = $Info["Rol"];
 
-            $_SESSION["_Es_AdminMaster"] = 0;
-            $_SESSION["_Es_ClienteAdmin"] = 0;
-            $_SESSION["_Es_Regional"] = 0;
-            $_SESSION["_Es_Gerente"] = 0;
+            $_SESSION["_Es_AdminMaster"] = ($Info["Rol"] === 'AdminMaster') ? 1 : 0;
+            $_SESSION["_Es_ClienteAdmin"] = ($Info["Rol"] === 'ClienteAdmin') ? 1 : 0;
+            $_SESSION["_Es_Regional"] = ($Info["Rol"] === 'Regional') ? 1 : 0;
+            $_SESSION["_Es_Gerente"] = ($Info["Rol"] === 'Gerente') ? 1 : 0;
 
-            if ($Info["Rol"] === 'AdminMaster') {
-                $_SESSION["_Es_AdminMaster"] = 1;
-            }
-
-            if ($Info["Rol"] === 'ClienteAdmin') {
-                $_SESSION["_Es_ClienteAdmin"] = 1;
-            }
-
-            if ($Info["Rol"] === 'Regional') {
-                $_SESSION["_Es_Regional"] = 1;
-            }
-
-            if ($Info["Rol"] === 'Gerente') {
-                $_SESSION["_Es_Gerente"] = 1;
-            }
-
+            // Limpieza final y envío de éxito
+            ob_end_clean();
             echo json_encode(array(
                 'success' => 1,
                 'redirect' => 'index.php?System=Dashboard'
             ), JSON_UNESCAPED_UNICODE);
-
-            return;
+            exit;
         }
 
         $Mensaje = $this->model->getLoginMotivo();
@@ -175,10 +173,12 @@ class LoginController
             $Mensaje = 'Credenciales inválidas.';
         }
 
+        ob_end_clean();
         echo json_encode(array(
             'success' => 0,
             'mensaje' => $Mensaje
         ), JSON_UNESCAPED_UNICODE);
+        exit;
     }
 
 

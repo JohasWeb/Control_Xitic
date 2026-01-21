@@ -1,6 +1,10 @@
 -- Archivo: full_database_structure.sql
 -- Descripción: Estructura COMPLETA del sistema (Core + Módulo Encuestas)
--- CAMBIOS: Autenticación por EMAIL obligatorio.
+-- INCLUYE: Creación de BD desde cero y Usuario Verificado.
+
+DROP DATABASE IF EXISTS `appXitic_ControlMaster`;
+CREATE DATABASE `appXitic_ControlMaster` DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE `appXitic_ControlMaster`;
 
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
@@ -245,7 +249,8 @@ INSERT INTO `sucursales` (`id`, `cliente_id`, `nombre`, `region`) VALUES
 
 -- 3. Usuario AdminMaster (AHORA CON EMAIL)
 -- Email: admin@xitic.com
--- Contraseña: password123 (hash bcrypt)
+-- Contraseña: password123 (hash bcrypt REAL: $2y$12$7glvVeWJ5GTKeUAhlUGyme33oC0pLDoHaHWZteGfNsj4LvUAE1U3e)
+
 INSERT INTO `usuarios` (`id`, `cliente_id`, `email`, `contrasena_hash`, `nombre`, `apellido`, `rol`, `estado`) VALUES
 (1, NULL, 'admin@xitic.com', '$2y$12$7glvVeWJ5GTKeUAhlUGyme33oC0pLDoHaHWZteGfNsj4LvUAE1U3e', 'Administrador', 'Sistema', 'AdminMaster', 'Activo');
 

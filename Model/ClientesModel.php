@@ -10,7 +10,7 @@ class ClientesModel
         $this->pdo = DataBase::conectar();
     }
 
-    public function listarClientes()
+    public function obtenerTodos()
     {
         try {
             $Sql = "SELECT * FROM clientes ORDER BY nombre_comercial ASC";
@@ -22,7 +22,7 @@ class ClientesModel
         }
     }
 
-    public function obtenerCliente($id)
+    public function obtenerPorId($id)
     {
         try {
             $Sql = "SELECT * FROM clientes WHERE id = :id LIMIT 1";
@@ -35,14 +35,15 @@ class ClientesModel
         }
     }
 
-    public function crearCliente($NombreComercial, $RazonSocial, $Rfc)
+    public function crear($NombreComercial, $RazonSocial, $Comentarios, $LogoUrl = null)
     {
         try {
-            $Sql = "INSERT INTO clientes (nombre_comercial, razon_social, rfc_tax_id, activo) VALUES (:nombre, :razon, :rfc, 1)";
+            $Sql = "INSERT INTO clientes (nombre_comercial, razon_social, comentarios, logo_url, activo) VALUES (:nombre, :razon, :comentarios, :logo, 1)";
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':nombre', trim($NombreComercial));
             $Stmt->bindValue(':razon', trim($RazonSocial));
-            $Stmt->bindValue(':rfc', trim($Rfc));
+            $Stmt->bindValue(':comentarios', trim($Comentarios));
+            $Stmt->bindValue(':logo', $LogoUrl);
             
             if ($Stmt->execute()) {
                 return $this->pdo->lastInsertId();
@@ -53,15 +54,28 @@ class ClientesModel
         }
     }
 
-    public function actualizarCliente($id, $NombreComercial, $RazonSocial, $Rfc)
+    public function actualizar($id, $NombreComercial, $RazonSocial, $Comentarios, $LogoUrl = null)
     {
         try {
-            $Sql = "UPDATE clientes SET nombre_comercial = :nombre, razon_social = :razon, rfc_tax_id = :rfc WHERE id = :id";
+            $Sql = "UPDATE clientes SET nombre_comercial = :nombre, razon_social = :razon, comentarios = :comentarios";
+            
+            // Solo actualizamos el logo si viene uno nuevo
+            if ($LogoUrl !== null) {
+                $Sql .= ", logo_url = :logo";
+            }
+            
+            $Sql .= " WHERE id = :id";
+            
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':nombre', trim($NombreComercial));
             $Stmt->bindValue(':razon', trim($RazonSocial));
-            $Stmt->bindValue(':rfc', trim($Rfc));
+            $Stmt->bindValue(':comentarios', trim($Comentarios));
             $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            
+            if ($LogoUrl !== null) {
+                $Stmt->bindValue(':logo', $LogoUrl);
+            }
+            
             return $Stmt->execute();
         } catch (Exception $e) {
             return false;
