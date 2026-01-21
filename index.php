@@ -4,7 +4,8 @@
  * Router principal del sistema.
  */
 
-error_reporting(0);
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
 
 $System_input = 'login';
 if (isset($_GET['System'])) {

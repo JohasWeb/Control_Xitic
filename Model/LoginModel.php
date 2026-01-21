@@ -5,7 +5,7 @@ class LoginModel
 {
     private $pdo;
 
-    private $usuario;
+    private $email;
     private $contrasenia;
 
     private $login_motivo;
@@ -22,16 +22,20 @@ class LoginModel
     }
 
     // SET (permitidos)
-    public function setUsuario($Usuario)
+    public function setEmail($Email)
     {
-        $Usuario = trim((string) $Usuario);
-        $Usuario = htmlspecialchars($Usuario, ENT_QUOTES, 'UTF-8');
+        $Email = trim((string) $Email);
+        $Email = htmlspecialchars($Email, ENT_QUOTES, 'UTF-8');
 
-        if ($Usuario === '' || strlen($Usuario) > 60) {
-            throw new InvalidArgumentException("Usuario inválido");
+        if (!filter_var($Email, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException("Formato de correo inválido");
         }
 
-        $this->usuario = $Usuario;
+        if ($Email === '' || strlen($Email) > 100) {
+            throw new InvalidArgumentException("Correo inválido");
+        }
+
+        $this->email = $Email;
     }
 
     public function setContrasenia($Contrasenia)
@@ -136,11 +140,11 @@ class LoginModel
         );
     }
 
-    private function bloqueoVigente($Usuario_texto, $Ip_remota)
+    private function bloqueoVigente($Email_texto, $Ip_remota)
     {
         $Sql = "SELECT fecha_bloqueo
                 FROM sesiones
-                WHERE usuario_texto = BINARY ?
+                WHERE email_texto = BINARY ?
                   AND ip_remota = ?
                   AND bloqueo_activo = 1
                   AND fecha_bloqueo IS NOT NULL
@@ -174,11 +178,11 @@ class LoginModel
         return false;
     }
 
-    private function obtenerUltimoIntento($Usuario_texto, $Ip_remota)
+    private function obtenerUltimoIntento($Email_texto, $Ip_remota)
     {
         $Sql = "SELECT intentos_fallidos_consecutivos, fecha_registro
                 FROM sesiones
-                WHERE usuario_texto = BINARY ?
+                WHERE email_texto = BINARY ?
                   AND ip_remota = ?
                 ORDER BY fecha_registro DESC
                 LIMIT 1";
@@ -204,7 +208,7 @@ class LoginModel
         return array('intentos' => $Intentos, 'fecha' => $Fecha);
     }
 
-    private function registrarEvento($Usuario_id, $Usuario_texto, $Tipo_evento, $Exito, $Motivo, $Intentos, $Bloqueo_activo, $Bloqueo_motivo)
+    private function registrarEvento($Usuario_id, $Email_texto, $Tipo_evento, $Exito, $Motivo, $Intentos, $Bloqueo_activo, $Bloqueo_motivo)
     {
         $Req = $this->obtenerInfoRequest();
 
@@ -214,7 +218,7 @@ class LoginModel
         }
 
         $Sql = "INSERT INTO sesiones
-                (usuario_id, usuario_texto, tipo_evento, exito_login, motivo,
+                (usuario_id, email_texto, tipo_evento, exito_login, motivo,
                  intentos_fallidos_consecutivos, bloqueo_activo, fecha_bloqueo, bloqueo_motivo,
                  ip_remota, ip_reenviada, user_agent, host, uri, metodo, protocolo, https, puerto,
                  sesion_php, huella_sha256)
@@ -266,27 +270,29 @@ class LoginModel
         $this->login_bloqueo_activo = 0;
         $this->usuario_sesion = null;
 
-        $Usuario_texto = (string) $this->usuario;
+        $this->usuario_sesion = null;
+
+        $Email_texto = (string) $this->email;
         $Contrasenia_texto = (string) $this->contrasenia;
 
         $Req = $this->obtenerInfoRequest();
         $Ip_remota = (string) $Req['ip_remota'];
 
-        if ($this->bloqueoVigente($Usuario_texto, $Ip_remota) === true) {
+        if ($this->bloqueoVigente($Email_texto, $Ip_remota) === true) {
             $this->login_motivo = 'Demasiados intentos. Intenta más tarde.';
             $this->login_bloqueo_activo = 1;
 
-            $this->registrarEvento(null, $Usuario_texto, 'LOGIN', 0, 'Bloqueo vigente', 0, 1, 'Bloqueo vigente');
+            $this->registrarEvento(null, $Email_texto, 'LOGIN', 0, 'Bloqueo vigente', 0, 1, 'Bloqueo vigente');
             return false;
         }
 
-        $Sql_user = "SELECT id, usuario, cliente_id, rol, nombre, apellido, contrasena_hash, estado
+        $Sql_user = "SELECT id, email, cliente_id, rol, nombre, apellido, contrasena_hash, estado
                     FROM usuarios
-                    WHERE usuario = BINARY ?
+                    WHERE email = BINARY ?
                     LIMIT 1";
 
         $Stmt = $this->pdo->prepare($Sql_user);
-        $Stmt->execute(array($Usuario_texto));
+        $Stmt->execute(array($Email_texto));
         $Info_user = $Stmt->fetch(PDO::FETCH_ASSOC);
 
         // Hash falso para evitar enumeración por tiempo
@@ -321,7 +327,7 @@ class LoginModel
             }
         }
 
-        $Ultimo = $this->obtenerUltimoIntento($Usuario_texto, $Ip_remota);
+        $Ultimo = $this->obtenerUltimoIntento($Email_texto, $Ip_remota);
 
         $Intentos_actual = 0;
         if (isset($Ultimo['intentos'])) {
@@ -349,12 +355,12 @@ class LoginModel
 
         if ($Password_ok === true) {
 
-            $this->registrarEvento($Usuario_id, $Usuario_texto, 'LOGIN', 1, $Motivo_interno, 0, 0, null);
+            $this->registrarEvento($Usuario_id, $Email_texto, 'LOGIN', 1, $Motivo_interno, 0, 0, null);
             $this->actualizarUltimoAcceso($Usuario_id);
 
             $this->usuario_sesion = array(
                 'id' => (int) $Info_user['id'],
-                'Usuario' => (string) $Info_user['usuario'],
+                'Usuario' => (string) $Info_user['email'],
                 'Rol' => (string) $Info_user['rol'],
                 'Nombre' => (string) $Info_user['nombre'],
                 'Apellidos' => (string) $Info_user['apellido']
@@ -374,13 +380,13 @@ class LoginModel
             $this->login_motivo = 'Demasiados intentos. Intenta más tarde.';
             $this->login_bloqueo_activo = 1;
 
-            $this->registrarEvento($Usuario_id, $Usuario_texto, 'LOGIN', 0, $Motivo_interno, $Intentos_nuevo, 1, $Motivo_bloqueo);
-            $this->registrarEvento($Usuario_id, $Usuario_texto, 'BLOQUEO', 0, 'Bloqueo por intentos', $Intentos_nuevo, 1, $Motivo_bloqueo);
+            $this->registrarEvento($Usuario_id, $Email_texto, 'LOGIN', 0, $Motivo_interno, $Intentos_nuevo, 1, $Motivo_bloqueo);
+            $this->registrarEvento($Usuario_id, $Email_texto, 'BLOQUEO', 0, 'Bloqueo por intentos', $Intentos_nuevo, 1, $Motivo_bloqueo);
 
             return false;
         }
 
-        $this->registrarEvento($Usuario_id, $Usuario_texto, 'LOGIN', 0, $Motivo_interno, $Intentos_nuevo, 0, null);
+        $this->registrarEvento($Usuario_id, $Email_texto, 'LOGIN', 0, $Motivo_interno, $Intentos_nuevo, 0, null);
 
         $this->login_motivo = 'Credenciales inválidas.';
         $this->login_bloqueo_activo = 0;

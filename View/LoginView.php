@@ -216,19 +216,19 @@ $Csrf_token = (string) $_SESSION['_csrf_token'];
 					<input type="hidden" name="csrf_token" id="csrf_token" value="<?php echo htmlspecialchars($Csrf_token, ENT_QUOTES, 'UTF-8'); ?>">
 
 					<div class="mb-3">
-						<label class="form-label" for="Usuario">Usuario</label>
+						<label class="form-label" for="email">Correo Electrónico</label>
 						<div class="input-icon">
-							<i class="fa-solid fa-user"></i>
+							<i class="fa-solid fa-envelope"></i>
 							<input
 								class="form-control"
-								type="text"
-								name="Usuario"
-								id="Usuario"
+								type="email"
+								name="email"
+								id="email"
 								required="required"
-								maxlength="60"
+								maxlength="100"
 								autofocus
 								autocomplete="off"
-								placeholder="Escribe tu usuario"
+								placeholder="ejemplo@correo.com"
 							>
 						</div>
 					</div>

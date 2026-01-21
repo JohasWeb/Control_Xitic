@@ -79,9 +79,9 @@ class LoginController
             return;
         }
 
-        $Usuario_texto = '';
-        if (isset($_POST['Usuario'])) {
-            $Usuario_texto = trim((string) $_POST['Usuario']);
+        $Email_texto = '';
+        if (isset($_POST['email'])) {
+            $Email_texto = trim((string) $_POST['email']);
         }
 
         $Pass_texto = '';
@@ -89,12 +89,12 @@ class LoginController
             $Pass_texto = (string) $_POST['pass'];
         }
 
-        if ($Usuario_texto === '' || strlen($Usuario_texto) > 60) {
+        if ($Email_texto === '' || strlen($Email_texto) > 100) {
             echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
             return;
         }
 
-        if (!preg_match('/^[a-zA-Z0-9@._-]+$/', $Usuario_texto)) {
+        if (!filter_var($Email_texto, FILTER_VALIDATE_EMAIL)) {
             echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
             return;
         }
@@ -105,7 +105,7 @@ class LoginController
         }
 
         try {
-            $this->model->setUsuario($Usuario_texto);
+            $this->model->setEmail($Email_texto);
             $this->model->setContrasenia($Pass_texto);
         } catch (Exception $e) {
             echo json_encode(array('success' => 0, 'mensaje' => 'Credenciales inválidas.'), JSON_UNESCAPED_UNICODE);
