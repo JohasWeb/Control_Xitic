@@ -90,9 +90,11 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                     <?php endif; ?>
                                 </td>
                                 <td class="text-end pe-4 py-3">
-                                    <button class="btn btn-sm btn-light border text-muted" title="Ver Perfil">
+                                <td class="text-end pe-4 py-3">
+                                    <a href="index.php?System=clientes&a=ver&id=<?php echo $C['id']; ?>" class="btn btn-sm btn-light border text-muted" title="Ver Perfil">
                                         <i class="bi bi-eye"></i>
-                                    </button>
+                                    </a>
+                                </td>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -183,5 +185,61 @@ $Csrf = SecurityController::obtenerCsrfToken();
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.querySelector('#modalCrearCliente form');
+    if(form) {
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const btnSubmit = form.querySelector('button[type="submit"]');
+            const originalText = btnSubmit.innerHTML;
+            btnSubmit.disabled = true;
+            btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Procesando...';
+
+            const formData = new FormData(form);
+
+            fetch(form.action, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if(data.success) {
+                    // 1. Cerrar Modal
+                    const modalEl = document.getElementById('modalCrearCliente');
+                    const modalInstance = bootstrap.Modal.getInstance(modalEl);
+                    if(modalInstance) modalInstance.hide();
+
+                    // 2. Descargar Archivo (Si existe)
+                    if(data.file) {
+                        const link = document.createElement('a');
+                        link.href = 'data:application/octet-stream;base64,' + data.file.content;
+                        link.download = data.file.name;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                    }
+
+                    // 3. Notificar y Recargar
+                   // alert(data.message);
+                    location.reload(); 
+                } else {
+                    alert('Error: ' + data.message);
+                    btnSubmit.disabled = false;
+                    btnSubmit.innerHTML = originalText;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Ocurrió un error inesperado al procesar la solicitud.');
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = originalText;
+            });
+        });
+    }
+});
+</script>
 
 <?php include 'View/layouts/footer.php'; ?>

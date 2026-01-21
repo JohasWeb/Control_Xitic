@@ -62,23 +62,18 @@ $Ruta_logout = 'index.php?System=Login&a=salir';
 
       <div class="collapse navbar-collapse" id="navbarXitic">
         <ul class="navbar-nav me-auto mb-2 mb-lg-0 ms-lg-4">
+          <?php $System = isset($_GET['System']) ? $_GET['System'] : ''; ?>
+          
           <li class="nav-item">
-            <a class="nav-link active" href="#"><i class="bi bi-speedometer2"></i>Inicio</a>
+            <a class="nav-link <?php echo ($System == '' || $System == 'Dashboard') ? 'active' : ''; ?>" href="index.php">
+                <i class="bi bi-speedometer2 me-1"></i>Inicio
+            </a>
           </li>
+          
           <li class="nav-item">
-            <a class="nav-link" href="#"><i class="bi bi-ui-checks-grid"></i>Encuestas</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#"><i class="bi bi-diagram-3"></i>Regiones</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#"><i class="bi bi-shop"></i>Sucursales</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#"><i class="bi bi-bar-chart"></i>Reportes</a>
-          </li>
-          <li class="nav-item">
-            <a class="nav-link" href="#"><i class="bi bi-people"></i>Usuarios</a>
+            <a class="nav-link <?php echo ($System == 'clientes') ? 'active' : ''; ?>" href="index.php?System=clientes">
+                <i class="bi bi-building me-1"></i>Clientes
+            </a>
           </li>
         </ul>
 

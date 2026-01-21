@@ -27,6 +27,24 @@ class ClientesController
         include_once "View/AdminMaster/Clientes/index.php";
     }
 
+    public function ver()
+    {
+        SecurityController::iniciarSesionSegura();
+        SecurityController::exigirAdminMaster();
+
+        $Id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $Cliente = $this->model->obtenerPorId($Id);
+
+        if (!$Cliente) {
+            header("Location: index.php?System=clientes");
+            exit;
+        }
+
+        $Stats = $this->model->obtenerStats($Id);
+        
+        include_once "View/AdminMaster/Clientes/ver.php";
+    }
+
     public function guardar()
     {
         // Limpiamos buffer
@@ -36,12 +54,15 @@ class ClientesController
         SecurityController::exigirAdminMaster();
 
         if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-            header("Location: index.php?System=clientes");
-            exit;
+             header('Content-Type: application/json');
+             echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+             exit;
         }
 
         if (!isset($_POST['csrf_token']) || !SecurityController::validarCsrfPost($_POST['csrf_token'])) {
-            die("Error de seguridad: Token CSRF inválido.");
+             header('Content-Type: application/json');
+             echo json_encode(['success' => false, 'message' => 'Error de seguridad: Token CSRF inválido']);
+             exit;
         }
 
         $Id = isset($_POST['id']) ? (int)$_POST['id'] : 0;
@@ -53,8 +74,8 @@ class ClientesController
         // Manejo de Logo
         $LogoUrl = null;
         if (isset($_FILES['logo']) && $_FILES['logo']['error'] === UPLOAD_ERR_OK) {
-            $DirSubida = 'assets/uploads/logos/';
-            // Crear dir si no existe (ya lo hicimos con mkdir, pero por robustez)
+            $DirSubida = '../Archivos/LogosClientes/';
+            // Crear dir si no existe
             if (!is_dir($DirSubida)) {
                 mkdir($DirSubida, 0755, true);
             }
@@ -80,18 +101,23 @@ class ClientesController
 
         // Validación
         if ($Nombre === '' || $AdminNombre === '' || $EmailAdmin === '') {
-            die("Error: Faltan datos obligatorios.");
+             die(json_encode(['success' => false, 'message' => 'Error: Faltan datos obligatorios.']));
         }
 
         try {
             if ($Id > 0) {
                 // Edición
                 $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl);
-                header("Location: index.php?System=clientes&msg=updated");
+                $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl);
+                echo json_encode(['success' => true, 'message' => 'Cliente actualizado correctamente']);
                 exit;
             } else {
                 // Creación
                 $NuevoClienteId = $this->model->crear($Nombre, $Razon, $Comentarios, $LogoUrl);
+
+                if (!$NuevoClienteId) {
+                    throw new Exception("No se pudo registrar el cliente en la base de datos.");
+                }
 
                 $PasswordRaw = $this->userModel->generarPassword(12);
 
@@ -115,16 +141,23 @@ class ClientesController
                 
                 $NombreArchivo = "Credenciales_" . preg_replace('/[^a-zA-Z0-9]/', '_', $Nombre) . ".txt";
 
-                header('Content-Type: application/octet-stream');
-                header('Content-Disposition: attachment; filename="'.basename($NombreArchivo).'"');
-                header('Content-Length: ' . strlen($ContenidoTxt));
-                
-                echo $ContenidoTxt;
+                $NombreArchivo = "Credenciales_" . preg_replace('/[^a-zA-Z0-9]/', '_', $Nombre) . ".txt";
+
+                echo json_encode([
+                    'success' => true,
+                    'message' => 'Cliente creado correctamente',
+                    'file' => [
+                        'name' => basename($NombreArchivo),
+                        'content' => base64_encode($ContenidoTxt)
+                    ]
+                ]);
                 exit;
             }
 
         } catch (Exception $e) {
-            die("Error al procesar: " . $e->getMessage());
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => 'Error al procesar: ' . $e->getMessage()]);
+            exit;
         }
     }
 }

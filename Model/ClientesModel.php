@@ -40,9 +40,9 @@ class ClientesModel
         try {
             $Sql = "INSERT INTO clientes (nombre_comercial, razon_social, comentarios, logo_url, activo) VALUES (:nombre, :razon, :comentarios, :logo, 1)";
             $Stmt = $this->pdo->prepare($Sql);
-            $Stmt->bindValue(':nombre', trim($NombreComercial));
-            $Stmt->bindValue(':razon', trim($RazonSocial));
-            $Stmt->bindValue(':comentarios', trim($Comentarios));
+            $Stmt->bindValue(':nombre', trim($NombreComercial ?? ''));
+            $Stmt->bindValue(':razon', trim($RazonSocial ?? ''));
+            $Stmt->bindValue(':comentarios', trim($Comentarios ?? ''));
             $Stmt->bindValue(':logo', $LogoUrl);
             
             if ($Stmt->execute()) {
@@ -93,6 +93,41 @@ class ClientesModel
             return $Stmt->execute();
         } catch (Exception $e) {
             return false;
+        }
+    }
+
+    public function obtenerStats($id)
+    {
+        try {
+            $Stats = [];
+            
+            // Usuarios
+            $Stmt = $this->pdo->prepare("SELECT COUNT(*) as total FROM usuarios WHERE cliente_id = :id");
+            $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $Stmt->execute();
+            $Stats['usuarios'] = $Stmt->fetchColumn();
+
+            // Marcas
+            $Stmt = $this->pdo->prepare("SELECT COUNT(*) as total FROM marcas WHERE cliente_id = :id");
+            $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $Stmt->execute();
+            $Stats['marcas'] = $Stmt->fetchColumn();
+
+            // Sucursales
+            $Stmt = $this->pdo->prepare("SELECT COUNT(*) as total FROM sucursales WHERE cliente_id = :id");
+            $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $Stmt->execute();
+            $Stats['sucursales'] = $Stmt->fetchColumn();
+            
+            // Encuestas
+            $Stmt = $this->pdo->prepare("SELECT COUNT(*) as total FROM encuestas WHERE cliente_id = :id");
+            $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
+            $Stmt->execute();
+            $Stats['encuestas'] = $Stmt->fetchColumn();
+
+            return $Stats;
+        } catch (Exception $e) {
+            return ['usuarios' => 0, 'marcas' => 0, 'sucursales' => 0, 'encuestas' => 0];
         }
     }
 }
