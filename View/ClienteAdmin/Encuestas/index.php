@@ -1,5 +1,11 @@
 <?php
-// View/ClienteAdmin/Encuestas/index.php
+/**
+ * Archivo: View/ClienteAdmin/Encuestas/index.php
+ * Propósito: Vista principal para el listado y gestión de encuestas.
+ * Autor: Refactorización Expert PHP
+ * Fecha: 2026-01-22
+ */
+
 include 'View/layouts/header_cliente.php';
 $Csrf = SecurityController::obtenerCsrfToken();
 ?>
@@ -51,11 +57,9 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                         </div>
                                     <?php else: ?>
                                         <div class="rounded border border-dashed bg-light d-flex align-items-center justify-content-center" style="width: 80px; height: 45px;">
-                                            <button class="btn btn-link text-decoration-none text-muted p-0" 
-                                                    onclick='abrirModalEditar(<?php echo json_encode($E); ?>)' 
-                                                    title="Subir Imagen">
+                                            <a href="index.php?System=encuestas&a=configuracion&id=<?= $E['id'] ?>" class="btn btn-link text-decoration-none text-muted p-0" title="Subir Imagen">
                                                 <i class="bi bi-image"></i>
-                                            </button>
+                                            </a>
                                         </div>
                                     <?php endif; ?>
                                 </td>
@@ -63,18 +67,38 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                     <div class="extra-small"><i class="bi bi-calendar-event me-1 text-muted"></i> <?php echo $E['fecha_inicio']; ?></div>
                                     <div class="extra-small">
                                         <i class="bi bi-calendar-check me-1 text-muted"></i> 
-                                        <?php echo $E['fecha_fin'] ? $E['fecha_fin'] : 'Sin límite'; ?>
+                                        <?php 
+                                        if ($E['fecha_fin']) {
+                                            echo $E['fecha_fin'];
+                                        } else {
+                                            echo 'Sin límite';
+                                        }
+                                        ?>
                                     </div>
                                 </td>
                                 <td class="py-3 align-middle">
                                     <div class="d-flex gap-2">
-                                        <?php if(isset($E['anonima']) && $E['anonima'] == 1): ?>
+                                        <?php 
+                                        $EsAnonima = false;
+                                        if (isset($E['anonima'])) {
+                                            if ($E['anonima'] == 1) {
+                                                $EsAnonima = true;
+                                            }
+                                        }
+                                        
+                                        if ($EsAnonima): ?>
                                             <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Anónima</span>
                                         <?php else: ?>
                                             <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle">Registro Req.</span>
                                         <?php endif; ?>
                                         
-                                        <?php if(isset($E['tiempo_estimado']) && $E['tiempo_estimado'] > 0): ?>
+                                        <?php 
+                                        $Tiempo = 0;
+                                        if (isset($E['tiempo_estimado'])) {
+                                            $Tiempo = $E['tiempo_estimado'];
+                                        }
+                                        
+                                        if ($Tiempo > 0): ?>
                                             <span class="badge bg-light text-dark border">
                                                 <i class="bi bi-stopwatch me-1"></i> <?php echo $E['tiempo_estimado']; ?> min
                                             </span>
@@ -83,11 +107,13 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                 </td>
                                 <td class="py-3 text-end pe-4">
                                     <div class="d-flex gap-2 justify-content-end">
-                                        <button class="btn btn-sm btn-light border text-primary" 
-                                                onclick='abrirModalEditar(<?php echo json_encode($E); ?>)' 
-                                                title="Editar Configuración">
-                                            <i class="bi bi-pencil-fill"></i>
-                                        </button>
+                                        <!-- Botón Editar ahora apunta a Configuración -->
+                                        <a href="index.php?System=encuestas&a=configuracion&id=<?= $E['id'] ?>" 
+                                           class="btn btn-sm btn-light border text-primary" 
+                                           title="Editar Configuración">
+                                            <i class="bi bi-gear-fill"></i>
+                                        </a>
+                                        
                                         <a href="index.php?System=encuestas&a=preguntas&id=<?php echo $E['id']; ?>" 
                                            class="btn btn-sm btn-light border text-dark" 
                                            title="Gestionar Preguntas">
@@ -104,7 +130,7 @@ $Csrf = SecurityController::obtenerCsrfToken();
     </div>
 </div>
 
-<!-- Modal Nueva Encuesta -->
+<!-- Modal Nueva Encuesta (Solo para crear) -->
 <div class="modal fade" id="modalEncuesta" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
@@ -128,9 +154,6 @@ $Csrf = SecurityController::obtenerCsrfToken();
                         <label class="form-label small fw-bold text-muted">Imagen de Encabezado (Opcional)</label>
                         <input type="file" class="form-control bg-light border-0" name="imagen_header" accept="image/*">
                         <div class="form-text extra-small text-muted">Recomendado: 1200x300px (JPG, PNG).</div>
-                        <div id="preview-container" class="mt-2 d-none">
-                            <img id="img-preview" src="" alt="Vista previa" class="img-fluid rounded border shadow-sm" style="max-height:100px;">
-                        </div>
                     </div>
 
                     <div class="row g-3 mb-3">
@@ -167,19 +190,6 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                     Anónima (Pública)
                                 </label>
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">Tiempo Estimado (Minutos) <span class="text-danger">*</span></label>
-                        <input type="number" class="form-control bg-light border-0" name="tiempo_estimado" value="5" min="1" required>
-                        <div class="form-text extra-small">Tiempo promedio para responder.</div>
-                    </div>
-                    
-                    <div class="alert alert-light border border-light-subtle d-flex align-items-start gap-2 mb-0">
-                        <i class="bi bi-info-circle text-primary mt-1"></i>
-                        <div class="extra-small text-muted">
-                           Podrás editar estos detalles después.
                         </div>
                     </div>
                 </div>
@@ -224,10 +234,8 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 inputFechaFin.disabled = false;
                 inputFechaFin.required = true;
-                // Restaurar fecha por defecto si está vacía? O dejar que usuario ponga.
                 if(!inputFechaFin.value) {
-                     // Fecha de mañana como placeholder? O +1 mes
-                     // Mejor no tocar si ya tenía algo, o poner hoy
+                     // Lógica opcional
                 }
             }
         });
@@ -248,83 +256,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         modal.show();
     };
+    
+    // Función abrirModalEditar eliminada intencionalmente, ahora se redirige.
 
-    window.abrirModalEditar = function(data) {
-        if (!modal) return;
-        document.getElementById('formEncuesta').reset();
-        
-        document.getElementById('encuestaId').value = data.id;
-        document.getElementById('formEncuesta').action = 'index.php?System=encuestas&a=actualizar'; // AJAX handling separate if needed, but form submit works for finding controller method if route logic supports it? controller expects POST to 'actualizar'
-        // Wait, routing is ?System=encuestas&a=... 
-        
-        document.querySelector('input[name="titulo"]').value = data.titulo;
-        document.querySelector('input[name="tiempo_estimado"]').value = data.tiempo_estimado;
-        document.querySelector('input[name="fecha_inicio"]').value = data.fecha_inicio;
-        
-        const fFin = document.getElementById('fechaFin');
-        if (data.fecha_fin) {
-             fFin.value = data.fecha_fin;
-             checkSinLimite.checked = false;
-        } else {
-             checkSinLimite.checked = true;
-        }
-        checkSinLimite.dispatchEvent(new Event('change'));
-
-        // Anonima?
-        if (data.anonima == 1) {
-             document.getElementById('tipoAnon').checked = true;
-        } else {
-             document.getElementById('tipoReg').checked = true;
-        }
-
-        document.querySelector('.modal-title').textContent = 'Editar Configuración';
-        
-        // Image Preview
-        const previewContainer = document.getElementById('preview-container');
-        const imgPreview = document.getElementById('img-preview');
-        const fileInput = document.querySelector('input[name="imagen_header"]');
-        fileInput.value = ''; // Reset file input
-
-        if (data.imagen_header) {
-            previewContainer.classList.remove('d-none');
-            imgPreview.src = data.imagen_header;
-        } else {
-            previewContainer.classList.add('d-none');
-            imgPreview.src = '';
-        }
-
-        modal.show();
-    };
-
-    // Auto submit logic update needed for AJAX if using 'actualizar' which returns JSON
     const form = document.getElementById('formEncuesta');
     if(form) {
         form.addEventListener('submit', function(e) {
-             const action = this.action;
-             if(action.includes('actualizar')) {
-                 e.preventDefault();
-                 const formData = new FormData(this);
-                 
-                 fetch(action, {
-                     method: 'POST',
-                     body: formData
-                 })
-                 .then(res => res.json())
-                 .then(data => {
-                     if(data.success) {
-                         location.reload();
-                     } else {
-                         alert(data.message);
-                     }
-                 })
-                 .catch(err => alert('Error al procesar'));
-             } else {
-                 // Creating uses standard post redirect
-                 const btn = this.querySelector('button[type="submit"]');
-                 if(btn) {
-                     btn.disabled = true;
-                     btn.innerHTML = 'Procesando...';
-                 }
+             const btn = this.querySelector('button[type="submit"]');
+             if(btn) {
+                 btn.disabled = true;
+                 btn.innerHTML = 'Procesando...';
              }
         });
     }

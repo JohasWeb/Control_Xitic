@@ -1,5 +1,11 @@
 <?php
-// View/ClienteAdmin/Encuestas/preguntas.php
+/**
+ * Archivo: View/ClienteAdmin/Encuestas/preguntas.php
+ * Propósito: Vista para la gestión (CRUD) de preguntas de una encuesta.
+ * Autor: Refactorización Expert PHP
+ * Fecha: 2026-01-22
+ */
+
 include 'View/layouts/header_cliente.php';
 $Csrf = SecurityController::obtenerCsrfToken();
 ?>
@@ -68,7 +74,10 @@ $Csrf = SecurityController::obtenerCsrfToken();
             </p>
         </div>
         <div class="d-flex gap-2">
-            <button class="btn btn-light border text-info bg-white shadow-sm" onclick="abrirAyuda()">
+            <a href="index.php?System=encuestas&a=responder&id=<?= $Encuesta['id'] ?>" target="_blank" class="btn btn-outline-primary rounded-pill px-4 fw-bold shadow-sm">
+                <i class="bi bi-eye-fill me-2"></i>Ver Encuesta
+            </a>
+            <button class="btn btn-light border text-info bg-white shadow-sm" onclick="modalAyuda.show()">
                 <i class="bi bi-question-circle me-1"></i> Ayuda
             </button>
             <button class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" 
@@ -101,24 +110,45 @@ $Csrf = SecurityController::obtenerCsrfToken();
                 <?php else: 
                     // Create Map for Logic Names
                     $MapNombres = [];
-                    foreach ($Preguntas as $Pre) $MapNombres[$Pre['id']] = $Pre['texto_pregunta'];
+                    foreach ($Preguntas as $Pre) {
+                        $MapNombres[$Pre['id']] = $Pre['texto_pregunta'];
+                    }
                 ?>
                     <?php foreach ($Preguntas as $P): 
-                        $Logica = json_decode($P['logica_condicional'] ?? '{}', true);
-                        $TieneLogica = !empty($Logica) && isset($Logica['rules']) && count($Logica['rules']) > 0;
+                        $Logica = array();
+                        if (isset($P['logica_condicional'])) {
+                            $Logica = json_decode($P['logica_condicional'], true);
+                        }
+                        
+                        $TieneLogica = false;
+                        if (!empty($Logica)) {
+                            if (isset($Logica['rules'])) {
+                                if (count($Logica['rules']) > 0) {
+                                    $TieneLogica = true;
+                                }
+                            }
+                        }
                         
                         $Opciones = [];
                         if($P['tipo_pregunta'] === 'unica' || $P['tipo_pregunta'] === 'multiple' || $P['tipo_pregunta'] === 'botonera') {
                              if(!empty($P['opciones_json'])) {
-                                 $Opciones = json_decode($P['opciones_json'], true) ?? [];
+                                 $Decoded = json_decode($P['opciones_json'], true);
+                                 if ($Decoded) {
+                                     $Opciones = $Decoded;
+                                 }
                              }
                              // Fallback for Botonera if empty (visual only)
-                             if($P['tipo_pregunta'] === 'botonera' && empty($Opciones)) {
-                                 $Opciones = ['Gran experiencia', 'Sugerencia', 'Tuve un problema'];
+                             if($P['tipo_pregunta'] === 'botonera') {
+                                 if (empty($Opciones)) {
+                                     $Opciones = ['Gran experiencia', 'Sugerencia', 'Tuve un problema'];
+                                 }
                              }
                         }
 
-                        $Config = json_decode($P['configuracion_json'] ?? '{}', true);
+                        $Config = array();
+                        if (isset($P['configuracion_json'])) {
+                            $Config = json_decode($P['configuracion_json'], true);
+                        }
                     ?>
                         <div class="list-group-item question-card p-3 rounded shadow-sm border-0 border-start border-4 mb-2" data-id="<?= $P['id'] ?>">
                             <div class="d-flex justify-content-between align-items-start">
@@ -150,8 +180,14 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                                 <div class="col-12">
                                                     <i class="bi bi-sliders me-1"></i> <strong>Configuración:</strong>
                                                     <?php if($P['tipo_pregunta'] === 'texto'): ?>
-                                                        <?php if (isset($Config['max_chars']) && $Config['max_chars'] > 0): ?>
-                                                            <span class="ms-1">Límite de <?= $Config['max_chars'] ?> caracteres.</span>
+                                                        <?php 
+                                                        $MaxChars = 0;
+                                                        if (isset($Config['max_chars'])) {
+                                                            $MaxChars = $Config['max_chars'];
+                                                        }
+                                                        
+                                                        if ($MaxChars > 0): ?>
+                                                            <span class="ms-1">Límite de <?= $MaxChars ?> caracteres.</span>
                                                         <?php else: ?>
                                                             <span class="ms-1 fst-italic">Sin límite de caracteres.</span>
                                                         <?php endif; ?>
@@ -177,14 +213,23 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                                 <div class="col-12 mt-2 pt-2 border-top">
                                                     <?php if ($TieneLogica): 
                                                         $Regla = $Logica['rules'][0];
-                                                        $NombrePadre = $MapNombres[$Regla['question_id']] ?? 'ID #' . $Regla['question_id'];
+                                                        
+                                                        $NombrePadre = 'ID #' . $Regla['question_id'];
+                                                        if (isset($MapNombres[$Regla['question_id']])) {
+                                                            $NombrePadre = $MapNombres[$Regla['question_id']];
+                                                        }
+
                                                         $MapOps = [
                                                             '==' => 'sea igual a',
                                                             '!=' => 'sea diferente de',
                                                             '>'  => 'sea mayor que',
                                                             '<'  => 'sea menor que'
                                                         ];
-                                                        $Operador = $MapOps[$Regla['operator']] ?? 'sea igual a';
+                                                        
+                                                        $Operador = 'sea igual a';
+                                                        if (isset($MapOps[$Regla['operator']])) {
+                                                            $Operador = $MapOps[$Regla['operator']];
+                                                        }
                                                     ?>
                                                         <div class="text-primary">
                                                             <i class="bi bi-diagram-2-fill me-1"></i>
@@ -586,7 +631,8 @@ $Csrf = SecurityController::obtenerCsrfToken();
         }
         if(logicJson) fd.set('logica_condicional', logicJson);
         else fd.delete('logica_condicional'); 
-
+        
+        // Fix for undefined action usage in fetch, using hardcoded relative path based on router
         fetch('index.php?System=encuestas&a=guardar_pregunta', {
             method: 'POST',
             body: fd

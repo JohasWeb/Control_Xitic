@@ -1,106 +1,182 @@
 <?php
+
+declare(strict_types=1);
+
+/**
+ * Archivo: Encuestas.Controller.php
+ * Propósito: Controlador para la gestión de encuestas y sus preguntas asociadas.
+ * Autor: Refactorización Expert PHP
+ * Fecha: 2026-01-22
+ */
+
 include_once "Controller/SecurityController.php";
 include_once "Model/EncuestasModel.php";
-include_once "Model/ClientesModel.php"; // Para cargar el select de clientes
+include_once "Model/EncuestasModel.php";
+include_once "Model/ClientesModel.php";
+include_once "Model/RegionesModel.php";
+include_once "Model/SucursalesModel.php";
 
+/**
+ * Clase EncuestasController
+ * 
+ * Gestiona el ciclo de vida de las encuestas: creación, edición, listado
+ * y administración de sus preguntas. Se adhiere a principios de Clean Code
+ * y validación estricta de tipos.
+ * 
+ * @package Control\Controller
+ */
 class EncuestasController
 {
-    private $model;
+    /**
+     * Modelo de datos para encuestas.
+     * @var EncuestasModel
+     */
+    private EncuestasModel $model;
 
+    /**
+     * Constructor.
+     * Inicializa el modelo de encuestas.
+     */
     public function __construct()
     {
         $this->model = new EncuestasModel();
     }
 
-    public function index()
+    /**
+     * Muestra el listado de encuestas.
+     * 
+     * Valida la autenticación y filtra las encuestas según el rol del usuario
+     * (AdminMaster ve todo, ClienteAdmin solo sus encuestas).
+     * 
+     * @return void
+     */
+    public function index(): void
     {
         SecurityController::exigirAutenticado();
         
-        // Si es AdminMaster ve todo, si no, solo lo de su cliente
         $ClienteId = null;
-        if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1) {
-            $Security = new SecurityController();
-            $ClienteId = $Security->obtenerClienteIdSesion();
+        
+        // Verificación explicita de rol para determinar el alcance de la vista
+        if (isset($_SESSION['_Es_ClienteAdmin'])) {
+            if ($_SESSION['_Es_ClienteAdmin'] == 1) {
+                $Security = new SecurityController();
+                $ClienteId = $Security->obtenerClienteIdSesion();
+            }
         }
 
         $Encuestas = $this->model->listarEncuestas($ClienteId);
+        
         include_once "View/ClienteAdmin/Encuestas/index.php";
     }
 
-    public function crear()
+    /**
+     * Muestra el formulario para crear una nueva encuesta.
+     * 
+     * @return void
+     */
+    public function crear(): void
     {
         SecurityController::exigirAutenticado();
         
         $ClientesModel = new ClientesModel();
-        $Clientes = $ClientesModel->listarClientes(); // Para el select
-
+        $Clientes = $ClientesModel->listarClientes();
+        
         include_once "View/ClienteAdmin/Encuestas/crear.php";
     }
 
-    public function guardar()
+    /**
+     * Procesa el almacenamiento de una nueva encuesta.
+     * 
+     * Valida Token CSRF y datos del formulario. Soporta preguntas dinámicas
+     * enviadas en el mismo request.
+     * 
+     * @return void
+     */
+    public function guardar(): void
     {
         SecurityController::exigirAutenticado();
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            
+            // Validación CSRF
             if (!SecurityController::validarCsrfPost($_POST['csrf_token'])) {
-                die("Token de seguridad inválido.");
+                // Manejo de error de seguridad
+                echo "Error: Token de seguridad inválido.";
+                return;
             }
 
             $Security = new SecurityController();
             $ClienteId = $Security->obtenerClienteIdSesion();
 
+            // Extracción y sanitización básica de variables
             $Titulo = $_POST['titulo'];
-            $Descripcion = isset($_POST['descripcion']) ? $_POST['descripcion'] : '';
-            $FechaInicio = isset($_POST['fecha_inicio']) ? $_POST['fecha_inicio'] : date('Y-m-d');
             
-            $SinLimite = isset($_POST['sin_limite']) ? true : false;
-            $FechaFin = isset($_POST['fecha_fin']) ? $_POST['fecha_fin'] : null;
+            $Descripcion = '';
+            if (isset($_POST['descripcion'])) {
+                $Descripcion = $_POST['descripcion'];
+            }
+
+            $FechaInicio = date('Y-m-d');
+            if (isset($_POST['fecha_inicio'])) {
+                $FechaInicio = $_POST['fecha_inicio'];
+            }
             
+            $SinLimite = false;
+            if (isset($_POST['sin_limite'])) {
+                $SinLimite = true;
+            }
+
+            $FechaFin = null;
+            if (isset($_POST['fecha_fin'])) {
+                $FechaFin = $_POST['fecha_fin'];
+            }
+            
+            // Lógica de fechas
             if ($SinLimite) {
                 $FechaFin = null;
             } else {
-                if (empty($FechaFin)) $FechaFin = date('Y-m-d', strtotime('+1 month'));
+                if (empty($FechaFin)) {
+                    $FechaFin = date('Y-m-d', strtotime('+1 month'));
+                }
             }
 
-            $Anonima = isset($_POST['anonima']) ? (int)$_POST['anonima'] : 0;
-            $TiempoEstimado = isset($_POST['tiempo_estimado']) ? (int)$_POST['tiempo_estimado'] : 5;
+            $Anonima = 0;
+            if (isset($_POST['anonima'])) {
+                $Anonima = (int)$_POST['anonima'];
+            }
+
+            $TiempoEstimado = 5;
+            if (isset($_POST['tiempo_estimado'])) {
+                $TiempoEstimado = (int)$_POST['tiempo_estimado'];
+            }
             
-            // 1. Crear la cabecera
-            $UsuarioId = (int)$_SESSION['usuario_id']; // Asegurar que usuario_id esté en sesión
-            // En LoginController: $_SESSION['usuario_id'] = $Info['id'];
-            // Si no está... usar $_SESSION["_AdminID_user"]
+            // Determinación del creador
+            $UsuarioId = (int)$_SESSION['usuario_id'];
+            
+            $Creador = 1;
+            if (isset($_SESSION["_AdminID_user"])) {
+                $Creador = $_SESSION["_AdminID_user"];
+            }
 
-            $Creador = isset($_SESSION["_AdminID_user"]) ? $_SESSION["_AdminID_user"] : 1;
-
+            // Procesamiento de imagen
             $ImagenHeader = $this->procesarImagen($_FILES);
 
-            $EncuestaId = $this->model->crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $Creador, $Anonima, $TiempoEstimado, $ImagenHeader);
+            // Persistencia
+            $EncuestaId = $this->model->crearEncuesta(
+                $ClienteId, 
+                $Titulo, 
+                $Descripcion, 
+                $FechaInicio, 
+                $FechaFin, 
+                $Creador, 
+                $Anonima, 
+                $TiempoEstimado, 
+                $ImagenHeader
+            );
 
             if ($EncuestaId) {
-                // 2. Procesar preguntas dinámicas
-                // Esperamos un array en $_POST['preguntas'] con la estructura:
-                // preguntas[0][texto], preguntas[0][tipo], ...
+                $this->procesarPreguntasIniciales($EncuestaId, $_POST);
                 
-                if (isset($_POST['preguntas']) && is_array($_POST['preguntas'])) {
-                    $Orden = 1;
-                    foreach ($_POST['preguntas'] as $P) {
-                        $Texto = $P['texto'];
-                        $Tipo = $P['tipo'];
-                        $Requerido = isset($P['requerido']) ? 1 : 0;
-                        
-                        // Opciones (si es select/radio)
-                        $OpcionesJson = null;
-                        if (isset($P['opciones']) && !empty($P['opciones'])) {
-                            // Separadas por coma o línea
-                            $ArrOpciones = array_map('trim', explode(',', $P['opciones']));
-                            $OpcionesJson = json_encode($ArrOpciones, JSON_UNESCAPED_UNICODE);
-                        }
-
-                        $this->model->agregarPregunta($EncuestaId, $Texto, $Tipo, $Orden, $Requerido, $OpcionesJson);
-                        $Orden++;
-                    }
-                }
-
                 header("Location: index.php?System=encuestas");
                 exit;
             } else {
@@ -109,11 +185,102 @@ class EncuestasController
         }
     }
 
-    public function actualizar()
+    /**
+     * Procesa las preguntas enviadas al crear la encuesta.
+     * 
+     * @param int $EncuestaId ID de la encuesta recién creada.
+     * @param array $PostData Datos del formulario POST.
+     * @return void
+     */
+    private function procesarPreguntasIniciales(int $EncuestaId, array $PostData): void
+    {
+        if (isset($PostData['preguntas'])) {
+            if (is_array($PostData['preguntas'])) {
+                $Orden = 1;
+                foreach ($PostData['preguntas'] as $P) {
+                    $Texto = $P['texto'];
+                    $Tipo = $P['tipo'];
+                    
+                    $Requerido = 0;
+                    if (isset($P['requerido'])) {
+                        $Requerido = 1;
+                    }
+                    
+                    $OpcionesJson = null;
+                    if (isset($P['opciones'])) {
+                        if (!empty($P['opciones'])) {
+                            $ArrOpciones = array_map('trim', explode(',', $P['opciones']));
+                            $OpcionesJson = json_encode($ArrOpciones, JSON_UNESCAPED_UNICODE);
+                        }
+                    }
+
+                    $this->model->agregarPregunta($EncuestaId, $Texto, $Tipo, $Orden, $Requerido, $OpcionesJson);
+                    $Orden++;
+                }
+            }
+        }
+    }
+
+
+
+    /**
+     * Muestra la vista de configuración completa de la encuesta.
+     * Incluye datos generales y asignaciones (Regiones/Sucursales).
+     * 
+     * @return void
+     */
+    public function configuracion(): void
+    {
+        SecurityController::exigirAutenticado();
+        
+        $Id = 0;
+        if (isset($_GET['id'])) {
+            $Id = (int)$_GET['id'];
+        }
+        
+        $Security = new SecurityController();
+        $ClienteId = $Security->obtenerClienteIdSesion();
+
+        $Encuesta = $this->model->obtenerEncuesta($Id);
+        
+        $EsPropietario = false;
+        if ($Encuesta) {
+            if ($Encuesta['cliente_id'] == $ClienteId) {
+                $EsPropietario = true;
+            }
+        }
+
+        if (!$EsPropietario) {
+            header("Location: index.php?System=encuestas");
+            exit;
+        }
+
+        // Cargar asignaciones actuales
+        $Asignaciones = $this->model->obtenerAsignaciones($Id);
+        
+        // Cargar Regiones y Sucursales para los selectores
+        $RegionesModel = new RegionesModel();
+        $Regiones = $RegionesModel->obtenerPorCliente($ClienteId);
+        
+        $SucursalesModel = new SucursalesModel();
+        $Sucursales = $SucursalesModel->obtenerPorCliente($ClienteId);
+        
+        include_once "View/ClienteAdmin/Encuestas/configuracion.php";
+    }
+
+    /**
+     * Actualiza una encuesta y sus asignaciones.
+     * 
+     * Responde con JSON.
+     * 
+     * @return void
+     */
+    public function actualizar(): void
     {
         SecurityController::exigirAutenticado();
 
         if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+            
             if (!SecurityController::validarCsrfPost($_POST['csrf_token'])) {
                 die("Token de seguridad inválido.");
             }
@@ -123,51 +290,136 @@ class EncuestasController
             
             $Id = (int)$_POST['id'];
             $Titulo = $_POST['titulo'];
-            // Validar que la encuesta pertenezca al cliente
+
+            // Validación de propiedad
             $Encuesta = $this->model->obtenerEncuesta($Id);
-            if (!$Encuesta || $Encuesta['cliente_id'] != $ClienteId) {
-                die("Acceso denegado.");
+            
+            $EsPropietario = false;
+            if ($Encuesta) {
+                if ($Encuesta['cliente_id'] == $ClienteId) {
+                    $EsPropietario = true;
+                }
             }
 
-            $Descripcion = isset($_POST['descripcion']) ? $_POST['descripcion'] : '';
-            $FechaInicio = isset($_POST['fecha_inicio']) ? $_POST['fecha_inicio'] : date('Y-m-d');
+            if (!$EsPropietario) {
+                die(json_encode(['success' => false, 'message' => 'Acceso denegado.']));
+            }
+
+            $Descripcion = '';
+            if (isset($_POST['descripcion'])) {
+                $Descripcion = $_POST['descripcion'];
+            }
+
+            $FechaInicio = date('Y-m-d');
+            if (isset($_POST['fecha_inicio'])) {
+                $FechaInicio = $_POST['fecha_inicio'];
+            }
             
-            $SinLimite = isset($_POST['sin_limite']) ? true : false;
-            $FechaFin = isset($_POST['fecha_fin']) ? $_POST['fecha_fin'] : null;
+            $SinLimite = false;
+            if (isset($_POST['sin_limite'])) {
+                $SinLimite = true;
+            }
+
+            $FechaFin = null;
+            if (isset($_POST['fecha_fin'])) {
+                $FechaFin = $_POST['fecha_fin'];
+            }
             
             if ($SinLimite) {
                 $FechaFin = null;
             } else {
-                if (empty($FechaFin)) $FechaFin = date('Y-m-d', strtotime('+1 month'));
+                if (empty($FechaFin)) {
+                    $FechaFin = date('Y-m-d', strtotime('+1 month'));
+                }
             }
 
-            $Anonima = isset($_POST['anonima']) ? (int)$_POST['anonima'] : 0;
-            $TiempoEstimado = isset($_POST['tiempo_estimado']) ? (int)$_POST['tiempo_estimado'] : 5;
+            $Anonima = 0;
+            if (isset($_POST['anonima'])) {
+                $Anonima = (int)$_POST['anonima'];
+            }
+
+            $TiempoEstimado = 5;
+            if (isset($_POST['tiempo_estimado'])) {
+                $TiempoEstimado = (int)$_POST['tiempo_estimado'];
+            }
 
             $ImagenHeader = $this->procesarImagen($_FILES);
 
-            $Res = $this->model->actualizarEncuesta($Id, $ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $Anonima, $TiempoEstimado, $ImagenHeader);
+            // Actualizar Datos Básicos
+            $Res = $this->model->actualizarEncuesta(
+                $Id, 
+                $ClienteId, 
+                $Titulo, 
+                $Descripcion, 
+                $FechaInicio, 
+                $FechaFin, 
+                $Anonima, 
+                $TiempoEstimado, 
+                $ImagenHeader
+            );
 
             if ($Res) {
-                echo json_encode(['success' => true, 'message' => 'Encuesta actualizada.']);
+                // Actualizar Asignaciones
+                $TipoAsignacion = 'CLIENTE'; // Default Global
+                if (isset($_POST['tipo_asignacion'])) {
+                    $TipoAsignacion = $_POST['tipo_asignacion'];
+                }
+
+                $this->model->limpiarAsignaciones($Id);
+
+                if ($TipoAsignacion === 'CLIENTE') {
+                    // Global (Toda la empresa)
+                    // Valor 0 indica todo el cliente
+                    $this->model->guardarAsignacion($Id, 'CLIENTE', 0);
+                } elseif ($TipoAsignacion === 'REGION') {
+                    if (isset($_POST['regiones_ids']) && is_array($_POST['regiones_ids'])) {
+                        foreach ($_POST['regiones_ids'] as $RegId) {
+                            $this->model->guardarAsignacion($Id, 'REGION', (int)$RegId);
+                        }
+                    }
+                } elseif ($TipoAsignacion === 'SUCURSAL') {
+                    if (isset($_POST['sucursales_ids']) && is_array($_POST['sucursales_ids'])) {
+                        foreach ($_POST['sucursales_ids'] as $SucId) {
+                            $this->model->guardarAsignacion($Id, 'SUCURSAL', (int)$SucId);
+                        }
+                    }
+                }
+                
+                echo json_encode(['success' => true, 'message' => 'Configuración actualizada correctamente.']);
             } else {
-                echo json_encode(['success' => false, 'message' => 'Error al actualizar.']);
+                echo json_encode(['success' => false, 'message' => 'Error al actualizar datos generales.']);
             }
-            exit; // AJAX response
+            exit;
         }
     }
 
-    public function preguntas()
+    /**
+     * Muestra la vista de gestión de preguntas de una encuesta.
+     * 
+     * @return void
+     */
+    public function preguntas(): void
     {
         SecurityController::exigirAutenticado();
         
-        $Id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $Id = 0;
+        if (isset($_GET['id'])) {
+            $Id = (int)$_GET['id'];
+        }
         
         $Security = new SecurityController();
         $ClienteId = $Security->obtenerClienteIdSesion();
 
         $Encuesta = $this->model->obtenerEncuesta($Id);
-        if (!$Encuesta || $Encuesta['cliente_id'] != $ClienteId) {
+        
+        $AccesoPermitido = false;
+        if ($Encuesta) {
+            if ($Encuesta['cliente_id'] == $ClienteId) {
+                $AccesoPermitido = true;
+            }
+        }
+
+        if (!$AccesoPermitido) {
             header("Location: index.php?System=encuestas");
             exit;
         }
@@ -177,10 +429,39 @@ class EncuestasController
         include_once "View/ClienteAdmin/Encuestas/preguntas.php";
     }
 
-    public function guardar_pregunta()
+    /**
+     * Vista pública para responder una encuesta.
+     * 
+     * @return void
+     */
+    public function responder(): void
     {
-        // Limpiar cualquier output previo (warnings, espacios, etc.)
-        if (ob_get_length()) ob_clean();
+        $Id = 0;
+        if (isset($_GET['id'])) {
+            $Id = (int)$_GET['id'];
+        }
+        
+        $Encuesta = $this->model->obtenerEncuesta($Id);
+        
+        if (!$Encuesta) {
+            die("Encuesta no encontrada.");
+        }
+        
+        $Preguntas = $this->model->obtenerPreguntas($Id);
+        
+        include_once "View/Public/Encuestas/responder.php";
+    }
+
+    /**
+     * Guarda (crea o actualiza) una pregunta vía AJAX.
+     * 
+     * @return void
+     */
+    public function guardar_pregunta(): void
+    {
+        if (ob_get_length()) {
+            ob_clean();
+        }
         
         header('Content-Type: application/json');
 
@@ -194,43 +475,78 @@ class EncuestasController
 
                 $EncuestaId = (int)$_POST['encuesta_id'];
                 
-                // Validar owner
+                // Validar propiedad
                 $Encuesta = $this->model->obtenerEncuesta($EncuestaId);
-                if (!$Encuesta || $Encuesta['cliente_id'] != $ClienteId) {
+                
+                $EsPropietario = false;
+                if ($Encuesta) {
+                    if ($Encuesta['cliente_id'] == $ClienteId) {
+                        $EsPropietario = true;
+                    }
+                }
+
+                if (!$EsPropietario) {
                     throw new Exception('Acceso denegado');
                 }
 
-                $Id = isset($_POST['pregunta_id']) && !empty($_POST['pregunta_id']) ? (int)$_POST['pregunta_id'] : null;
+                $Id = null;
+                if (isset($_POST['pregunta_id'])) {
+                    if (!empty($_POST['pregunta_id'])) {
+                        $Id = (int)$_POST['pregunta_id'];
+                    }
+                }
+
                 $Texto = $_POST['texto_pregunta'];
-                if(empty($Texto)) throw new Exception('El texto de la pregunta es obligatorio');
+                if (empty($Texto)) {
+                    throw new Exception('El texto de la pregunta es obligatorio');
+                }
 
                 $Tipo = $_POST['tipo_pregunta']; 
-                $Requerido = isset($_POST['requerido']) ? 1 : 0;
                 
-                // Opciones
+                $Requerido = 0;
+                if (isset($_POST['requerido'])) {
+                    $Requerido = 1;
+                }
+                
+                // Procesamiento de opciones
                 $OpcionesJson = null;
-                if (isset($_POST['opciones']) && trim($_POST['opciones']) !== '') {
-                    $Raw = str_replace(["\r\n", "\r"], "\n", $_POST['opciones']);
-                    $Arr = explode("\n", $Raw);
-                    $Arr = array_map('trim', $Arr);
-                    $Arr = array_filter($Arr, function($val) { return $val !== ''; }); 
-                    $Arr = array_values($Arr);
-                    $OpcionesJson = json_encode($Arr, JSON_UNESCAPED_UNICODE);
-                }
-                // En caso de Botonera u otros que manden opciones como JSON string directo desde JS (si aplica)
-                if (isset($_POST['opciones_json_raw']) && !empty($_POST['opciones_json_raw'])) {
-                    $OpcionesJson = $_POST['opciones_json_raw'];
+                if (isset($_POST['opciones'])) {
+                    if (trim($_POST['opciones']) !== '') {
+                        $Raw = str_replace(["\r\n", "\r"], "\n", $_POST['opciones']);
+                        $Arr = explode("\n", $Raw);
+                        $Arr = array_map('trim', $Arr);
+                        
+                        // Filtrar vacíos de forma explícita
+                        $Arr = array_filter($Arr, function($val) { 
+                            return $val !== ''; 
+                        }); 
+                        
+                        $Arr = array_values($Arr);
+                        $OpcionesJson = json_encode($Arr, JSON_UNESCAPED_UNICODE);
+                    }
                 }
 
-                // Lógica y Configuración
-                $Logica = isset($_POST['logica_condicional']) ? $_POST['logica_condicional'] : null;
-                $Config = isset($_POST['configuracion_json']) ? $_POST['configuracion_json'] : null;
+                if (isset($_POST['opciones_json_raw'])) {
+                    if (!empty($_POST['opciones_json_raw'])) {
+                        $OpcionesJson = $_POST['opciones_json_raw'];
+                    }
+                }
 
+                // Configuración adicional
+                $Logica = null;
+                if (isset($_POST['logica_condicional'])) {
+                    $Logica = $_POST['logica_condicional'];
+                }
+
+                $Config = null;
+                if (isset($_POST['configuracion_json'])) {
+                    $Config = $_POST['configuracion_json'];
+                }
+
+                $Res = false;
                 if ($Id) {
-                    // Actualizar existente
                     $Res = $this->model->actualizarPregunta($Id, $EncuestaId, $Texto, $Tipo, $Requerido, $OpcionesJson, $Logica, $Config);
                 } else {
-                    // Crear nueva
                     $Total = count($this->model->obtenerPreguntas($EncuestaId));
                     $Orden = $Total + 1;
                     $Res = $this->model->agregarPregunta($EncuestaId, $Texto, $Tipo, $Orden, $Requerido, $OpcionesJson, $Logica, $Config);
@@ -250,40 +566,60 @@ class EncuestasController
         }
     }
 
-    public function reordenar_preguntas()
+    /**
+     * Reordena las preguntas de una encuesta.
+     * 
+     * Recibe JSON en el cuerpo de la petición.
+     * 
+     * @return void
+     */
+    public function reordenar_preguntas(): void
     {
         SecurityController::exigirAutenticado();
         
         $JsonData = file_get_contents('php://input');
         $Data = json_decode($JsonData, true);
 
-        if (!$Data || !isset($Data['encuesta_id']) || !isset($Data['items'])) {
+        if (!$Data) {
             echo json_encode(['success' => false, 'message' => 'Datos inválidos']);
             exit;
         }
 
+        if (!isset($Data['encuesta_id']) || !isset($Data['items'])) {
+            echo json_encode(['success' => false, 'message' => 'Datos incompletos']);
+            exit;
+        }
+
         $EncuestaId = (int)$Data['encuesta_id'];
-        $Items = $Data['items']; // Array de {id: 123, orden: 1}
+        $Items = $Data['items']; 
 
         $Security = new SecurityController();
         $ClienteId = $Security->obtenerClienteIdSesion();
 
-        // Validar owner
         $Encuesta = $this->model->obtenerEncuesta($EncuestaId);
-        if (!$Encuesta || $Encuesta['cliente_id'] != $ClienteId) {
+        
+        $EsPropietario = false;
+        if ($Encuesta) {
+            if ($Encuesta['cliente_id'] == $ClienteId) {
+                $EsPropietario = true;
+            }
+        }
+
+        if (!$EsPropietario) {
              echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
              exit;
         }
-
-        // Seguridad extra: verificar que las preguntas pertenezcan a esa encuesta (el modelo solo actualiza por ID, pero idealmente filtramos)
-        // Por ahora confiamos en el ID de pregunta, pero el modelo debería validar owner si fuera estricto. 
-        // Como estamos en un entorno controlado de cliente admin, asumimos que los IDs enviados son correctos.
 
         $Res = $this->model->reordenarPreguntas($Items);
         echo json_encode(['success' => $Res]);
     }
 
-    public function eliminar_pregunta()
+    /**
+     * Elimina una pregunta.
+     * 
+     * @return void
+     */
+    public function eliminar_pregunta(): void
     {
         SecurityController::exigirAutenticado();
         
@@ -293,9 +629,16 @@ class EncuestasController
         $Security = new SecurityController();
         $ClienteId = $Security->obtenerClienteIdSesion();
         
-        // Validar owner de la encuesta
         $Encuesta = $this->model->obtenerEncuesta($EncuestaId);
-        if (!$Encuesta || $Encuesta['cliente_id'] != $ClienteId) {
+        
+        $EsPropietario = false;
+        if ($Encuesta) {
+            if ($Encuesta['cliente_id'] == $ClienteId) {
+                $EsPropietario = true;
+            }
+        }
+
+        if (!$EsPropietario) {
              echo json_encode(['success' => false, 'message' => 'Acceso denegado']);
              exit;
         }
@@ -304,8 +647,20 @@ class EncuestasController
         
         echo json_encode(['success' => $Res]);
     }
-    private function procesarImagen($FileData) {
-        if (!isset($FileData['imagen_header']) || $FileData['imagen_header']['error'] !== UPLOAD_ERR_OK) {
+
+    /**
+     * Procesa la subida de una imagen de cabecera.
+     * 
+     * @param array $FileData Datos de $_FILES.
+     * @return string|null Ruta de la imagen guardada o null si falla/no hay imagen.
+     */
+    private function procesarImagen(array $FileData): ?string
+    {
+        if (!isset($FileData['imagen_header'])) {
+            return null;
+        }
+
+        if ($FileData['imagen_header']['error'] !== UPLOAD_ERR_OK) {
             return null;
         }
 

@@ -1,10 +1,36 @@
 <?php
+
+declare(strict_types=1);
+
+/**
+ * Archivo: EncuestasModel.php
+ * Propósito: Modelo de datos para la gestión de encuestas en base de datos.
+ * Autor: Refactorización Expert PHP
+ * Fecha: 2026-01-22
+ */
+
 include_once "DataBase.php";
 
+/**
+ * Clase EncuestasModel
+ * 
+ * Capa de acceso a datos para encuestas, preguntas y configuración relacionada.
+ * Utiliza PDO para consultas seguras y preparadas.
+ * 
+ * @package Control\Model
+ */
 class EncuestasModel
 {
-    private $pdo;
+    /**
+     * Instancia de conexión a la base de datos.
+     * @var PDO
+     */
+    private PDO $pdo;
 
+    /**
+     * Constructor.
+     * Establece la conexión a la base de datos.
+     */
     public function __construct()
     {
         $this->pdo = DataBase::conectar();
@@ -12,7 +38,13 @@ class EncuestasModel
 
     // --- ENCUESTAS ---
 
-    public function listarEncuestas($ClienteId = null)
+    /**
+     * Lista las encuestas disponibles.
+     * 
+     * @param int|null $ClienteId ID del cliente para filtrar (opcional). Si es null, retorna todas.
+     * @return array Array de encuestas (asociativo).
+     */
+    public function listarEncuestas(?int $ClienteId = null): array
     {
         try {
             $Sql = "SELECT e.*, c.nombre_comercial as cliente_nombre 
@@ -21,35 +53,71 @@ class EncuestasModel
             
             $Params = array();
 
-            if ($ClienteId !== null && $ClienteId > 0) {
-                $Sql .= " WHERE e.cliente_id = :cliente_id";
-                $Params[':cliente_id'] = $ClienteId;
+            if ($ClienteId !== null) {
+                if ($ClienteId > 0) {
+                    $Sql .= " WHERE e.cliente_id = :cliente_id";
+                    $Params[':cliente_id'] = $ClienteId;
+                }
             }
 
             $Sql .= " ORDER BY e.id DESC";
 
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->execute($Params);
+            
             return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+
         } catch (Exception $e) {
             return array();
         }
     }
 
-    public function obtenerEncuesta($id)
+    /**
+     * Obtiene una encuesta específica por ID.
+     * 
+     * @param int $id ID de la encuesta.
+     * @return array|false Datos de la encuesta o false si falla/no existe.
+     */
+    public function obtenerEncuesta(int $id): array|false
     {
         try {
             $Sql = "SELECT * FROM encuestas WHERE id = :id LIMIT 1";
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':id', $id, PDO::PARAM_INT);
             $Stmt->execute();
+            
             return $Stmt->fetch(PDO::FETCH_ASSOC);
+
         } catch (Exception $e) {
-            return null;
+            return false;
         }
     }
 
-    public function crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $CreadoPor, $Anonima = 0, $TiempoEstimado = 5, $ImagenHeader = null)
+    /**
+     * Crea una nueva encuesta en la base de datos.
+     * 
+     * @param int $ClienteId ID del cliente propietario.
+     * @param string $Titulo Título de la encuesta.
+     * @param string $Descripcion Descripción detallada.
+     * @param string $FechaInicio Fecha de inicio (Y-m-d).
+     * @param string|null $FechaFin Fecha de fin (Y-m-d) o null si es indefinida.
+     * @param int $CreadoPor ID del usuario creador.
+     * @param int $Anonima Flag (1 o 0) si es anónima.
+     * @param int $TiempoEstimado Tiempo estimado en minutos.
+     * @param string|null $ImagenHeader Ruta de la imagen de cabecera (opcional).
+     * @return string|false ID de la encuesta inertada o false en caso de error.
+     */
+    public function crearEncuesta(
+        int $ClienteId, 
+        string $Titulo, 
+        string $Descripcion, 
+        string $FechaInicio, 
+        ?string $FechaFin, 
+        int $CreadoPor, 
+        int $Anonima = 0, 
+        int $TiempoEstimado = 5, 
+        ?string $ImagenHeader = null
+    ): string|false
     {
         try {
             $Sql = "INSERT INTO encuestas 
@@ -72,12 +140,37 @@ class EncuestasModel
                 return $this->pdo->lastInsertId();
             }
             return false;
+
         } catch (Exception $e) {
             return false;
         }
     }
 
-    public function actualizarEncuesta($Id, $ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $Anonima, $TiempoEstimado, $ImagenHeader = null)
+    /**
+     * Actualiza los datos de una encuesta existente.
+     * 
+     * @param int $Id ID de la encuesta.
+     * @param int $ClienteId ID del cliente (para validación de propiedad).
+     * @param string $Titulo Título.
+     * @param string $Descripcion Descripción.
+     * @param string $FechaInicio Fecha de inicio.
+     * @param string|null $FechaFin Fecha de fin.
+     * @param int $Anonima Flag anónima.
+     * @param int $TiempoEstimado Tiempo estimado.
+     * @param string|null $ImagenHeader Ruta de la nueva imagen (si se actualiza).
+     * @return bool True si tuvo éxito, False si falló.
+     */
+    public function actualizarEncuesta(
+        int $Id, 
+        int $ClienteId, 
+        string $Titulo, 
+        string $Descripcion, 
+        string $FechaInicio, 
+        ?string $FechaFin, 
+        int $Anonima, 
+        int $TiempoEstimado, 
+        ?string $ImagenHeader = null
+    ): bool
     {
         try {
             $SetImg = "";
@@ -98,12 +191,76 @@ class EncuestasModel
             $Stmt->bindValue(':fin', $FechaFin);
             $Stmt->bindValue(':anonima', $Anonima, PDO::PARAM_INT);
             $Stmt->bindValue(':tiempo_estimado', $TiempoEstimado, PDO::PARAM_INT);
+            
             if ($ImagenHeader !== null) {
                 $Stmt->bindValue(':img', $ImagenHeader);
             }
+            
             $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
             $Stmt->bindValue(':cliente_id', $ClienteId, PDO::PARAM_INT);
 
+            return $Stmt->execute();
+
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    // --- ASIGNACIONES ---
+
+    /**
+     * Obtiene las asignaciones actuales de una encuesta.
+     * 
+     * @param int $EncuestaId
+     * @return array Lista de asignaciones.
+     */
+    public function obtenerAsignaciones(int $EncuestaId): array
+    {
+        try {
+            $Sql = "SELECT * FROM encuestas_asignaciones WHERE encuesta_id = :id";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
+            $Stmt->execute();
+            return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Limpia todas las asignaciones de una encuesta (para sobreescribir).
+     * 
+     * @param int $EncuestaId
+     * @return bool
+     */
+    public function limpiarAsignaciones(int $EncuestaId): bool
+    {
+        try {
+            $Sql = "DELETE FROM encuestas_asignaciones WHERE encuesta_id = :id";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
+            return $Stmt->execute();
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    /**
+     * Guarda una nueva asignación.
+     * 
+     * @param int $EncuestaId
+     * @param string $Nivel 'CLIENTE', 'REGION', 'SUCURSAL'
+     * @param int $ValorId ID de región/sucursal o 0 si es Cliente.
+     * @return bool
+     */
+    public function guardarAsignacion(int $EncuestaId, string $Nivel, int $ValorId = 0): bool
+    {
+        try {
+            $Sql = "INSERT INTO encuestas_asignaciones (encuesta_id, nivel, valor_id) VALUES (:id, :nivel, :valor)";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
+            $Stmt->bindValue(':nivel', $Nivel);
+            $Stmt->bindValue(':valor', $ValorId, PDO::PARAM_INT);
             return $Stmt->execute();
         } catch (Exception $e) {
             return false;
@@ -112,20 +269,50 @@ class EncuestasModel
 
     // --- PREGUNTAS ---
 
-    public function obtenerPreguntas($EncuestaId)
+    /**
+     * Obtiene las preguntas asociadas a una encuesta.
+     * 
+     * @param int $EncuestaId ID encuesta.
+     * @return array Lista de preguntas ordenadas.
+     */
+    public function obtenerPreguntas(int $EncuestaId): array
     {
         try {
             $Sql = "SELECT * FROM encuestas_preguntas WHERE encuesta_id = :id ORDER BY orden ASC";
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
             $Stmt->execute();
+            
             return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+
         } catch (Exception $e) {
             return array();
         }
     }
 
-    public function agregarPregunta($EncuestaId, $Texto, $Tipo, $Orden, $Requerido, $OpcionesJson, $Logica = null, $Config = null)
+    /**
+     * Agrega una nueva pregunta a la encuesta.
+     * 
+     * @param int $EncuestaId ID de la encuesta.
+     * @param string $Texto Texto de la pregunta.
+     * @param string $Tipo Tipo de input (text, select, etc.).
+     * @param int $Orden Número de orden.
+     * @param int $Requerido 1 si es requerida, 0 si no.
+     * @param string|null $OpcionesJson JSON string de opciones.
+     * @param string|null $Logica Lógica condicional (opcional).
+     * @param string|null $Config Configuración extra JSON (opcional).
+     * @return bool Éxito o fallo.
+     */
+    public function agregarPregunta(
+        int $EncuestaId, 
+        string $Texto, 
+        string $Tipo, 
+        int $Orden, 
+        int $Requerido, 
+        ?string $OpcionesJson, 
+        ?string $Logica = null, 
+        ?string $Config = null
+    ): bool
     {
         try {
             $Sql = "INSERT INTO encuestas_preguntas 
@@ -144,12 +331,35 @@ class EncuestasModel
             $Stmt->bindValue(':config', $Config);
 
             return $Stmt->execute();
+
         } catch (Exception $e) {
             return false;
         }
     }
 
-    public function actualizarPregunta($Id, $EncuestaId, $Texto, $Tipo, $Requerido, $OpcionesJson, $Logica = null, $Config = null)
+    /**
+     * Actualiza una pregunta existente.
+     * 
+     * @param int $Id ID de la pregunta.
+     * @param int $EncuestaId ID de la encuesta (para safe check).
+     * @param string $Texto Texto.
+     * @param string $Tipo Tipo.
+     * @param int $Requerido Requerido (1/0).
+     * @param string|null $OpcionesJson Opciones JSON.
+     * @param string|null $Logica Lógica condicional.
+     * @param string|null $Config Configuración JSON.
+     * @return bool Éxito o fallo.
+     */
+    public function actualizarPregunta(
+        int $Id, 
+        int $EncuestaId, 
+        string $Texto, 
+        string $Tipo, 
+        int $Requerido, 
+        ?string $OpcionesJson, 
+        ?string $Logica = null, 
+        ?string $Config = null
+    ): bool
     {
         try {
             $Sql = "UPDATE encuestas_preguntas 
@@ -168,23 +378,37 @@ class EncuestasModel
             $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
 
             return $Stmt->execute();
+
         } catch (Exception $e) {
             return false;
         }
     }
 
-    public function reordenarPreguntas($Items)
+    /**
+     * Reordena un conjunto de preguntas en una transacción.
+     * 
+     * @param array $Items Array de arays con 'id' y 'orden'.
+     * @return bool Éxito o fallo.
+     */
+    public function reordenarPreguntas(array $Items): bool
     {
         try {
             $this->pdo->beginTransaction();
+            
             $Sql = "UPDATE encuestas_preguntas SET orden = :orden WHERE id = :id";
             $Stmt = $this->pdo->prepare($Sql);
 
             foreach ($Items as $Item) {
-                $Stmt->bindValue(':orden', $Item['orden'], PDO::PARAM_INT);
-                $Stmt->bindValue(':id', $Item['id'], PDO::PARAM_INT);
-                $Stmt->execute();
+                // Validación básica de estructura del item
+                if (isset($Item['orden'])) {
+                    if (isset($Item['id'])) {
+                        $Stmt->bindValue(':orden', (int)$Item['orden'], PDO::PARAM_INT);
+                        $Stmt->bindValue(':id', (int)$Item['id'], PDO::PARAM_INT);
+                        $Stmt->execute();
+                    }
+                }
             }
+            
             $this->pdo->commit();
             return true;
         } catch (Exception $e) {
@@ -193,27 +417,43 @@ class EncuestasModel
         }
     }
 
-    public function eliminarPregunta($Id, $EncuestaId)
+    /**
+     * Elimina una pregunta de la base de datos.
+     * 
+     * @param int $Id ID de la pregunta.
+     * @param int $EncuestaId ID de la encuesta.
+     * @return bool Éxito o fallo.
+     */
+    public function eliminarPregunta(int $Id, int $EncuestaId): bool
     {
         try {
             $Sql = "DELETE FROM encuestas_preguntas WHERE id = :id AND encuesta_id = :encuesta_id";
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
             $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
+            
             return $Stmt->execute();
+
         } catch (Exception $e) {
             return false;
         }
     }
 
-    public function borrarPreguntas($EncuestaId)
+    /**
+     * Borra todas las preguntas de una encuesta.
+     * 
+     * @param int $EncuestaId ID de la encuesta.
+     * @return bool Éxito o fallo.
+     */
+    public function borrarPreguntas(int $EncuestaId): bool
     {
-        // Útil para actualizar la encuesta borrando y recreando preguntas
         try {
             $Sql = "DELETE FROM encuestas_preguntas WHERE encuesta_id = :id";
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
+            
             return $Stmt->execute();
+
         } catch (Exception $e) {
             return false;
         }
@@ -221,7 +461,14 @@ class EncuestasModel
 
     // --- QR / MEMBRESÍA ---
 
-    public function obtenerTokenQr($SucursalId, $Mesa)
+    /**
+     * Obtiene info de un token QR.
+     * 
+     * @param int $SucursalId ID sucursal.
+     * @param string $Mesa Identificador de mesa.
+     * @return array|false Datos o false.
+     */
+    public function obtenerTokenQr(int $SucursalId, string $Mesa): array|false
     {
         try {
             $Sql = "SELECT * FROM sucursales_qr WHERE sucursal_id = :sucursal AND mesa = :mesa LIMIT 1";
@@ -229,16 +476,25 @@ class EncuestasModel
             $Stmt->bindValue(':sucursal', $SucursalId, PDO::PARAM_INT);
             $Stmt->bindValue(':mesa', $Mesa);
             $Stmt->execute();
+            
             return $Stmt->fetch(PDO::FETCH_ASSOC);
+
         } catch (Exception $e) {
-            return null;
+            return false;
         }
     }
 
-    public function generarTokenQr($SucursalId, $Mesa)
+    /**
+     * Genera un nuevo token QR único.
+     * 
+     * @param int $SucursalId ID sucursal.
+     * @param string $Mesa Identificador de mesa.
+     * @return string|false Token generado o false.
+     */
+    public function generarTokenQr(int $SucursalId, string $Mesa): string|false
     {
         try {
-            $Token = bin2hex(random_bytes(16)); // 32 caracteres
+            $Token = bin2hex(random_bytes(16)); 
             
             $Sql = "INSERT INTO sucursales_qr (sucursal_id, mesa, token_unico, activo) 
                     VALUES (:sucursal, :mesa, :token, 1)";
@@ -252,8 +508,8 @@ class EncuestasModel
                 return $Token;
             }
             return false;
+
         } catch (Exception $e) {
-            // Si falla por duplicidad de token, reintentar recursivamente (caso raro)
             return false;
         }
     }

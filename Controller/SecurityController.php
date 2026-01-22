@@ -56,9 +56,11 @@ class SecurityController
             $_SESSION['_csrf_token'] = bin2hex(random_bytes(32));
         }
 
-        header('X-Frame-Options: DENY');
-        header('X-Content-Type-Options: nosniff');
-        header('Referrer-Policy: same-origin');
+        if (!headers_sent()) {
+            header('X-Frame-Options: DENY');
+            header('X-Content-Type-Options: nosniff');
+            header('Referrer-Policy: same-origin');
+        }
     }
 
     /**
