@@ -267,6 +267,111 @@ class EncuestasModel
         }
     }
 
+    /**
+     * Obtiene la lista de sucursales habilitadas para esta encuesta.
+     * Resuelve la lógica de asignación (CLIENTE -> Todas, REGION -> Sucursales de región, SUCURSAL -> Específicas).
+     * 
+     * @param int $EncuestaId
+     * @param int $ClienteId
+     * @return array
+     */
+    public function obtenerSucursalesAlcance(int $EncuestaId, int $ClienteId): array
+    {
+        $Asignaciones = $this->obtenerAsignaciones($EncuestaId);
+        
+        // Default: CLIENTE (Todas)
+        $Tipo = 'CLIENTE'; 
+        if (!empty($Asignaciones)) {
+            $Tipo = $Asignaciones[0]['nivel'];
+        }
+
+        try {
+            if ($Tipo === 'CLIENTE') {
+                // Todas las sucursales activas del cliente
+                $Sql = "SELECT s.id, s.nombre, s.region 
+                        FROM sucursales s 
+                        WHERE s.cliente_id = :cliente_id AND s.activo = 1 
+                        ORDER BY s.region ASC, s.nombre ASC";
+                $Stmt = $this->pdo->prepare($Sql);
+                $Stmt->bindValue(':cliente_id', $ClienteId, PDO::PARAM_INT);
+                $Stmt->execute();
+                return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+
+            } elseif ($Tipo === 'REGION') {
+                // Sucursales que pertenezcan a las regiones asignadas
+                $RegionesIds = [];
+                foreach ($Asignaciones as $A) {
+                    if ($A['valor_id'] > 0) $RegionesIds[] = $A['valor_id'];
+                }
+                
+                if (empty($RegionesIds)) return [];
+
+                $Placeholders = implode(',', array_fill(0, count($RegionesIds), '?'));
+                $Sql = "SELECT s.id, s.nombre, s.region 
+                        FROM sucursales s 
+                        JOIN regiones r ON s.region = r.nombre
+                        WHERE s.cliente_id = ? 
+                          AND r.id IN ($Placeholders)
+                          AND s.activo = 1 
+                        ORDER BY s.region ASC, s.nombre ASC";
+                
+                // Nota: Relación Sucursal->Region es por NOMBRE en tabla sucursales ('region' varchar)???
+                // Revisando SucursalesModel: 'region' es varchar. Pero en RegionesModel 'nombre' es varchar.
+                // Es arriesgado hacer JOIN por nombre si puede cambiar.
+                // PERO... Sucursales no tiene region_id? Revisé SucursalesModel y tiene 'region' string.
+                // Asumimos Join por nombre region = r.nombre y r.cliente_id = s.cliente_id
+                
+                // Mejor aproximación si no hay region_id FK real:
+                // Obtener nombres de regiones primero
+                $SqlReg = "SELECT nombre FROM regiones WHERE id IN ($Placeholders)";
+                $StmtReg = $this->pdo->prepare($SqlReg);
+                $StmtReg->execute($RegionesIds);
+                $NombresRegiones = $StmtReg->fetchAll(PDO::FETCH_COLUMN);
+
+                if (empty($NombresRegiones)) return [];
+                
+                $PlaceholdersNombres = implode(',', array_fill(0, count($NombresRegiones), '?'));
+                $Params = array_merge([$ClienteId], $NombresRegiones);
+                
+                $SqlS = "SELECT s.id, s.nombre, s.region 
+                         FROM sucursales s 
+                         WHERE s.cliente_id = ? 
+                           AND s.region IN ($PlaceholdersNombres)
+                           AND s.activo = 1 
+                         ORDER BY s.region ASC, s.nombre ASC";
+                $StmtS = $this->pdo->prepare($SqlS);
+                $StmtS->execute($Params);
+                return $StmtS->fetchAll(PDO::FETCH_ASSOC);
+
+            } elseif ($Tipo === 'SUCURSAL') {
+                // Sucursales específicas
+                $SucIDs = [];
+                foreach ($Asignaciones as $A) {
+                    if ($A['valor_id'] > 0) $SucIDs[] = $A['valor_id'];
+                }
+
+                if (empty($SucIDs)) return [];
+
+                $Placeholders = implode(',', array_fill(0, count($SucIDs), '?'));
+                $Params = array_merge([$ClienteId], $SucIDs);
+                
+                $Sql = "SELECT s.id, s.nombre, s.region 
+                        FROM sucursales s 
+                        WHERE s.cliente_id = ? 
+                          AND s.id IN ($Placeholders)
+                          AND s.activo = 1 
+                        ORDER BY s.region ASC, s.nombre ASC";
+                $Stmt = $this->pdo->prepare($Sql);
+                $Stmt->execute($Params);
+                return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+            }
+        } catch (Exception $e) {
+            return [];
+        }
+
+        return [];
+    }
+
     // --- PREGUNTAS ---
 
     /**
