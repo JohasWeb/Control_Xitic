@@ -161,6 +161,12 @@ class EncuestasController
             // Procesamiento de imagen
             $ImagenHeader = $this->procesarImagen($_FILES);
 
+            // Configuración de Diseño (JSON)
+            $ConfigJson = null;
+            if (isset($_POST['configuracion'])) {
+               $ConfigJson = $_POST['configuracion']; // Ya viene como JSON string o array? Asumiremos string JSON del front
+            }
+
             // Persistencia
             $EncuestaId = $this->model->crearEncuesta(
                 $ClienteId, 
@@ -171,7 +177,8 @@ class EncuestasController
                 $Creador, 
                 $Anonima, 
                 $TiempoEstimado, 
-                $ImagenHeader
+                $ImagenHeader,
+                $ConfigJson
             );
 
             if ($EncuestaId) {
@@ -264,6 +271,9 @@ class EncuestasController
         
         $SucursalesModel = new SucursalesModel();
         $Sucursales = $SucursalesModel->obtenerPorCliente($ClienteId);
+
+        // Sucursales Habilitadas (Para QRs)
+        $SucursalesHabilitadas = $this->model->obtenerSucursalesAlcance($Id, $ClienteId);
         
         include_once "View/ClienteAdmin/Encuestas/configuracion.php";
     }
@@ -345,6 +355,11 @@ class EncuestasController
 
             $ImagenHeader = $this->procesarImagen($_FILES);
 
+            $ConfigJson = null;
+            if (isset($_POST['configuracion'])) {
+                $ConfigJson = $_POST['configuracion'];
+            }
+
             // Actualizar Datos Básicos
             $Res = $this->model->actualizarEncuesta(
                 $Id, 
@@ -355,7 +370,8 @@ class EncuestasController
                 $FechaFin, 
                 $Anonima, 
                 $TiempoEstimado, 
-                $ImagenHeader
+                $ImagenHeader,
+                $ConfigJson
             );
 
             if ($Res) {
@@ -684,5 +700,123 @@ class EncuestasController
         }
 
         return null;
+    }
+    /**
+     * Guarda la respuesta pública de una encuesta (AJAX).
+     * 
+     * @return void
+     */
+    public function guardar_respuesta_publica(): void
+    {
+        if (ob_get_length()) {
+            ob_clean();
+        }
+        
+        header('Content-Type: application/json');
+
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            echo json_encode(['success' => false, 'message' => 'Método no permitido']);
+            exit;
+        }
+
+        try {
+            $EncuestaId = (int)$_POST['encuesta_id'];
+            $SucursalId = isset($_POST['sucursal_id']) ? (int)$_POST['sucursal_id'] : 0;
+            
+            if (!$EncuestaId) {
+                throw new Exception('ID de encuesta inválido');
+            }
+
+            // Validar que la encuesta exista y esté activa (opcional, pero recomendado)
+            $Encuesta = $this->model->obtenerEncuesta($EncuestaId);
+            if (!$Encuesta) {
+                throw new Exception('Encuesta no encontrada');
+            }
+
+            $Respuestas = $_POST['resp'] ?? [];
+            $Comentarios = $_POST['comentarios'] ?? []; // Nuevo campo para comentarios
+
+            if (empty($Respuestas)) {
+                throw new Exception('No hay respuestas para guardar');
+            }
+
+            $Exito = $this->model->guardarRespuesta($EncuestaId, $SucursalId, $Respuestas, $Comentarios);
+            
+            if ($Exito) {
+                echo json_encode(['success' => true]);
+            } else {
+                throw new Exception('Error al guardar en base de datos');
+            }
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
+    }
+    /**
+     * Endpoint AJAX para guardar solo la configuración de diseño.
+     * Útil para la vista de preguntas donde no se editan todos los campos.
+     */
+    public function guardar_diseno_ajax(): void
+    {
+        if (ob_get_length()) ob_clean();
+        header('Content-Type: application/json');
+
+        try {
+            SecurityController::exigirAutenticado();
+
+             if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+                throw new Exception('Método inválido');
+             }
+
+             // Validar CSRF
+             if (!SecurityController::validarCsrfPost($_POST['csrf_token'])) {
+                 throw new Exception('Token de seguridad inválido');
+             }
+
+             $EncuestaId = (int)$_POST['id'];
+             
+             // Validar propiedad
+             $Security = new SecurityController();
+             $ClienteId = $Security->obtenerClienteIdSesion();
+             $Encuesta = $this->model->obtenerEncuesta($EncuestaId);
+             
+             if (!$Encuesta || $Encuesta['cliente_id'] != $ClienteId) {
+                 throw new Exception('Acceso denegado o encuesta no encontrada');
+             }
+
+             $ConfigJson = $_POST['configuracion'] ?? null;
+             
+             $Titulo = $Encuesta['titulo']; 
+             $Descripcion = $Encuesta['descripcion']; 
+             $FechaInicio = $Encuesta['fecha_inicio'];
+             $FechaFin = $Encuesta['fecha_fin'];
+             $Anonima = isset($_POST['anonima']) ? (int)$_POST['anonima'] : $Encuesta['anonima'];
+             $TiempoEstimado = isset($_POST['tiempo_estimado']) ? (int)$_POST['tiempo_estimado'] : $Encuesta['tiempo_estimado'];
+             $ImagenHeader = null; 
+
+             $Res = $this->model->actualizarEncuesta(
+                $EncuestaId, 
+                $ClienteId, 
+                $Titulo, 
+                $Descripcion, 
+                $FechaInicio, 
+                $FechaFin, 
+                $Anonima, 
+                $TiempoEstimado, 
+                $ImagenHeader,
+                $ConfigJson
+            );
+
+            if ($Res) {
+                echo json_encode(['success' => true]);
+            } else {
+                throw new Exception('Error al actualizar base de datos');
+            }
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+        }
+        exit;
     }
 }

@@ -116,14 +116,15 @@ class EncuestasModel
         int $CreadoPor, 
         int $Anonima = 0, 
         int $TiempoEstimado = 5, 
-        ?string $ImagenHeader = null
+        ?string $ImagenHeader = null,
+        ?string $ConfiguracionJson = null
     ): string|false
     {
         try {
             $Sql = "INSERT INTO encuestas 
-                    (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, estado, creado_por, anonima, tiempo_estimado, imagen_header) 
+                    (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, estado, creado_por, anonima, tiempo_estimado, imagen_header, configuracion_json) 
                     VALUES 
-                    (:cliente_id, :titulo, :descripcion, :inicio, :fin, 1, :creado_por, :anonima, :tiempo_estimado, :img)";
+                    (:cliente_id, :titulo, :descripcion, :inicio, :fin, 1, :creado_por, :anonima, :tiempo_estimado, :img, :config)";
             
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':cliente_id', $ClienteId, PDO::PARAM_INT);
@@ -135,6 +136,7 @@ class EncuestasModel
             $Stmt->bindValue(':anonima', $Anonima, PDO::PARAM_INT);
             $Stmt->bindValue(':tiempo_estimado', $TiempoEstimado, PDO::PARAM_INT);
             $Stmt->bindValue(':img', $ImagenHeader);
+            $Stmt->bindValue(':config', $ConfiguracionJson);
 
             if ($Stmt->execute()) {
                 return $this->pdo->lastInsertId();
@@ -169,7 +171,8 @@ class EncuestasModel
         ?string $FechaFin, 
         int $Anonima, 
         int $TiempoEstimado, 
-        ?string $ImagenHeader = null
+        ?string $ImagenHeader = null,
+        ?string $ConfiguracionJson = null
     ): bool
     {
         try {
@@ -180,7 +183,8 @@ class EncuestasModel
 
             $Sql = "UPDATE encuestas 
                     SET titulo = :titulo, descripcion = :descripcion, fecha_inicio = :inicio, 
-                        fecha_fin = :fin, anonima = :anonima, tiempo_estimado = :tiempo_estimado
+                        fecha_fin = :fin, anonima = :anonima, tiempo_estimado = :tiempo_estimado,
+                        configuracion_json = :config
                         $SetImg
                     WHERE id = :id AND cliente_id = :cliente_id";
             
@@ -191,6 +195,7 @@ class EncuestasModel
             $Stmt->bindValue(':fin', $FechaFin);
             $Stmt->bindValue(':anonima', $Anonima, PDO::PARAM_INT);
             $Stmt->bindValue(':tiempo_estimado', $TiempoEstimado, PDO::PARAM_INT);
+            $Stmt->bindValue(':config', $ConfiguracionJson);
             
             if ($ImagenHeader !== null) {
                 $Stmt->bindValue(':img', $ImagenHeader);
@@ -419,42 +424,25 @@ class EncuestasModel
         ?string $Config = null
     ): bool
     {
-        try {
-            $Sql = "INSERT INTO encuestas_preguntas 
-                    (encuesta_id, texto_pregunta, tipo_pregunta, orden, requerido, opciones_json, logica_condicional, configuracion_json)
-                    VALUES 
-                    (:encuesta_id, :texto, :tipo, :orden, :requerido, :opciones, :logica, :config)";
+        // Try-catch removed for debugging
+        $Sql = "INSERT INTO encuestas_preguntas 
+                (encuesta_id, texto_pregunta, tipo_pregunta, orden, requerido, opciones_json, logica_condicional, configuracion_json)
+                VALUES 
+                (:encuesta_id, :texto, :tipo, :orden, :requerido, :opciones, :logica, :config)";
 
-            $Stmt = $this->pdo->prepare($Sql);
-            $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
-            $Stmt->bindValue(':texto', $Texto);
-            $Stmt->bindValue(':tipo', $Tipo);
-            $Stmt->bindValue(':orden', $Orden, PDO::PARAM_INT);
-            $Stmt->bindValue(':requerido', $Requerido, PDO::PARAM_INT);
-            $Stmt->bindValue(':opciones', $OpcionesJson);
-            $Stmt->bindValue(':logica', $Logica);
-            $Stmt->bindValue(':config', $Config);
+        $Stmt = $this->pdo->prepare($Sql);
+        $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
+        $Stmt->bindValue(':texto', $Texto);
+        $Stmt->bindValue(':tipo', $Tipo);
+        $Stmt->bindValue(':orden', $Orden, PDO::PARAM_INT);
+        $Stmt->bindValue(':requerido', $Requerido, PDO::PARAM_INT);
+        $Stmt->bindValue(':opciones', $OpcionesJson);
+        $Stmt->bindValue(':logica', $Logica);
+        $Stmt->bindValue(':config', $Config);
 
-            return $Stmt->execute();
-
-        } catch (Exception $e) {
-            return false;
-        }
+        return $Stmt->execute();
     }
 
-    /**
-     * Actualiza una pregunta existente.
-     * 
-     * @param int $Id ID de la pregunta.
-     * @param int $EncuestaId ID de la encuesta (para safe check).
-     * @param string $Texto Texto.
-     * @param string $Tipo Tipo.
-     * @param int $Requerido Requerido (1/0).
-     * @param string|null $OpcionesJson Opciones JSON.
-     * @param string|null $Logica Lógica condicional.
-     * @param string|null $Config Configuración JSON.
-     * @return bool Éxito o fallo.
-     */
     public function actualizarPregunta(
         int $Id, 
         int $EncuestaId, 
@@ -466,27 +454,23 @@ class EncuestasModel
         ?string $Config = null
     ): bool
     {
-        try {
-            $Sql = "UPDATE encuestas_preguntas 
-                    SET texto_pregunta = :texto, tipo_pregunta = :tipo, requerido = :requerido, 
-                        opciones_json = :opciones, logica_condicional = :logica, configuracion_json = :config
-                    WHERE id = :id AND encuesta_id = :encuesta_id";
+        // Try-catch removed for debugging
+        $Sql = "UPDATE encuestas_preguntas 
+                SET texto_pregunta = :texto, tipo_pregunta = :tipo, requerido = :requerido, 
+                    opciones_json = :opciones, logica_condicional = :logica, configuracion_json = :config
+                WHERE id = :id AND encuesta_id = :encuesta_id";
 
-            $Stmt = $this->pdo->prepare($Sql);
-            $Stmt->bindValue(':texto', $Texto);
-            $Stmt->bindValue(':tipo', $Tipo);
-            $Stmt->bindValue(':requerido', $Requerido, PDO::PARAM_INT);
-            $Stmt->bindValue(':opciones', $OpcionesJson);
-            $Stmt->bindValue(':logica', $Logica);
-            $Stmt->bindValue(':config', $Config);
-            $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
-            $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
+        $Stmt = $this->pdo->prepare($Sql);
+        $Stmt->bindValue(':texto', $Texto);
+        $Stmt->bindValue(':tipo', $Tipo);
+        $Stmt->bindValue(':requerido', $Requerido, PDO::PARAM_INT);
+        $Stmt->bindValue(':opciones', $OpcionesJson);
+        $Stmt->bindValue(':logica', $Logica);
+        $Stmt->bindValue(':config', $Config);
+        $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
+        $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
 
-            return $Stmt->execute();
-
-        } catch (Exception $e) {
-            return false;
-        }
+        return $Stmt->execute();
     }
 
     /**
@@ -615,6 +599,62 @@ class EncuestasModel
             return false;
 
         } catch (Exception $e) {
+            return false;
+        }
+    }
+    // --- RESPUESTAS ---
+
+    /**
+     * Guarda la respuesta de una encuesta.
+     * 
+     * @param int $EncuestaId
+     * @param int $SucursalId
+     * @param array $Respuestas Array [pregunta_id => valor]
+     * @param array $Comentarios Array [pregunta_id => texto]
+     * @return bool
+     */
+    public function guardarRespuesta(int $EncuestaId, int $SucursalId, array $Respuestas, array $Comentarios = []): bool
+    {
+        try {
+            $this->pdo->beginTransaction();
+
+            // 1. Guardar Cabecera
+            $SqlHead = "INSERT INTO encuestas_respuestas (encuesta_id, sucursal_id, ip_address, user_agent) 
+                        VALUES (:encuesta, :sucursal, :ip, :ua)";
+            $StmtHead = $this->pdo->prepare($SqlHead);
+            $StmtHead->bindValue(':encuesta', $EncuestaId, PDO::PARAM_INT);
+            $StmtHead->bindValue(':sucursal', $SucursalId, PDO::PARAM_INT);
+            $StmtHead->bindValue(':ip', $_SERVER['REMOTE_ADDR'] ?? null);
+            $StmtHead->bindValue(':ua', $_SERVER['HTTP_USER_AGENT'] ?? null);
+            $StmtHead->execute();
+            
+            $RespuestaId = $this->pdo->lastInsertId();
+
+            // 2. Guardar Detalles
+            $SqlDet = "INSERT INTO encuestas_respuestas_detalles (respuesta_id, pregunta_id, respuesta, comentario) 
+                       VALUES (:resp_id, :preg_id, :val, :comment)";
+            $StmtDet = $this->pdo->prepare($SqlDet);
+
+            foreach ($Respuestas as $PreguntaId => $Valor) {
+                // Si es array (checkbox), convertir a JSON o string
+                if (is_array($Valor)) {
+                    $Valor = implode(', ', $Valor);
+                }
+
+                $Comentario = $Comentarios[$PreguntaId] ?? null;
+
+                $StmtDet->bindValue(':resp_id', $RespuestaId, PDO::PARAM_INT);
+                $StmtDet->bindValue(':preg_id', $PreguntaId, PDO::PARAM_INT);
+                $StmtDet->bindValue(':val', $Valor);
+                $StmtDet->bindValue(':comment', $Comentario);
+                $StmtDet->execute();
+            }
+
+            $this->pdo->commit();
+            return true;
+
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
             return false;
         }
     }

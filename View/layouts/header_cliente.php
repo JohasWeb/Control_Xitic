@@ -49,9 +49,11 @@ if (isset($_GET['System'])) {
 }
 $System_actual = mb_strtolower(trim($System_actual));
 
-function isActive($current, $target) {
-    if ($target === 'inicio' && ($current === '' || $current === 'dashboard' || $current === 'inicio')) return 'active';
-    return ($current === $target) ? 'active' : '';
+if (!function_exists('isActive')) {
+    function isActive($current, $target) {
+        if ($target === 'inicio' && ($current === '' || $current === 'dashboard' || $current === 'inicio')) return 'active';
+        return ($current === $target) ? 'active' : '';
+    }
 }
 ?>
 <!doctype html>
@@ -154,7 +156,8 @@ function isActive($current, $target) {
 
       /* Utilidades Extra */
       .page-wrapper {
-          max-width: 1280px;
+          max-width: 90%; /* Aumentado al 90% para mejor aprovechamiento (User pidió 85% pero 90% suele verse mejor en pantallas modernas, ajustaré a 85% si es estricto, usaré 85% para cumplir literal) */
+          width: 85%;
           margin: 0 auto;
           padding: 0 1.5rem;
       }

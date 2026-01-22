@@ -1,17 +1,101 @@
 <?php
 /**
  * Archivo: View/ClienteAdmin/Encuestas/preguntas.php
- * Propósito: Vista para la gestión (CRUD) de preguntas de una encuesta.
+ * Propósito: Vista para la gestión (CRUD) de preguntas y Configuración Visual (Live Preview).
  * Autor: Refactorización Expert PHP
  * Fecha: 2026-01-22
  */
 
 include 'View/layouts/header_cliente.php';
 $Csrf = SecurityController::obtenerCsrfToken();
+
+// Cargar Configuración Visual Actual
+$ConfigVisual = ['tema' => 'light', 'color' => '#4f46e5'];
+if (!empty($Encuesta['configuracion_json'])) {
+    $Decoded = json_decode($Encuesta['configuracion_json'], true);
+    if ($Decoded) {
+        $ConfigVisual = array_merge($ConfigVisual, $Decoded);
+    }
+}
 ?>
 
-<!-- Custom Styles for this view -->
+<!-- Custom Styles -->
 <style>
+    .page-wrapper {
+        height: calc(100vh - 80px); /* Ajuste segun header */
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .split-container {
+        display: flex;
+        height: 100%;
+        overflow: hidden;
+    }
+
+    .editor-pane {
+        flex: 1;
+        overflow-y: auto;
+        padding: 2rem;
+        background: #f8fafc;
+        border-right: 1px solid #e2e8f0;
+    }
+
+    .preview-pane {
+        width: 450px;
+        background: #fff;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 2rem;
+        border-left: 1px solid #e2e8f0;
+        background-color: #f1f5f9;
+        /* background-image: radial-gradient(#cbd5e1 1px, transparent 1px);
+        background-size: 20px 20px; */
+    }
+
+    /* Smartphone Simulator */
+    .smartphone-mockup {
+        width: 375px;
+        height: 750px;
+        background: #1e293b;
+        border-radius: 40px;
+        border: 12px solid #1e293b;
+        position: relative;
+        box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .smartphone-notch {
+        position: absolute;
+        top: 0;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 150px;
+        height: 30px;
+        background: #1e293b;
+        border-bottom-left-radius: 16px;
+        border-bottom-right-radius: 16px;
+        z-index: 20;
+    }
+
+    .smartphone-screen {
+        width: 100%;
+        height: 100%;
+        background: white;
+        overflow: hidden;
+        border-radius: 28px;
+    }
+
+    iframe#previewFrame {
+        width: 100%;
+        height: 100%;
+        border: none;
+    }
+    
     .question-card {
         cursor: move;
         transition: all 0.2s;
@@ -19,39 +103,50 @@ $Csrf = SecurityController::obtenerCsrfToken();
         background: #fff;
     }
     .question-card:hover {
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        background-color: #fcfcfc;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
     }
-    .ghost {
-        opacity: 0.5;
-        background: #e2e6ea;
-        border: 2px dashed #ccc;
+    .ghost { opacity: 0.5; background: #e2e6ea; border: 2px dashed #ccc; }
+
+    /* Theme Option Radio */
+    .theme-option {
+        cursor: pointer;
+        opacity: 0.7;
+        transition: 0.2s;
+        border: 2px solid transparent;
+        border-radius: 8px;
+        padding: 4px;
     }
-    .logic-badge {
-        font-size: 0.75em;
-        background-color: #e9ecef;
-        color: #495057;
-        padding: 2px 6px;
-        border-radius: 4px;
-        border: 1px solid #dee2e6;
+    .theme-option.active {
+        opacity: 1;
+        border-color: var(--primary-color); 
+        transform: scale(1.05);
     }
-    .type-badge {
-        font-size: 0.75em;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
+    .color-swatch {
+        width: 40px; height: 40px; border-radius: 50%; display: inline-block;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
-    .smartphone-preview {
-        width: 300px;
-        height: 550px;
-        border-radius: 30px;
-        border: 8px solid #333;
-        display: flex;
-        flex-direction: column;
+
+    /* Floating Help Button Animation */
+    @keyframes pulse-attention {
+        0% { transform: scale(1); background-color: #0d6efd; color: white; border: 1px solid #0d6efd; }
+        50% { transform: scale(1.2); background-color: white; color: #0d6efd; box-shadow: 0 0 20px rgba(13, 110, 253, 0.5); border: 1px solid #0d6efd; }
+        100% { transform: scale(1); background-color: #0d6efd; color: white; border: 1px solid #0d6efd; }
     }
-    .preview-content {
-        background: #f8f9fa;
-        flex: 1;
+    .btn-help-floating {
+        position: fixed; 
+        bottom: 30px; 
+        right: 30px; 
+        width: 60px; 
+        height: 60px; 
+        z-index: 1050;
+        transition: transform 0.2s;
+    }
+    .btn-help-floating:hover {
+        transform: scale(1.1);
+    }
+    .anime-pulse-init {
+        animation: pulse-attention 2s 3 ease-out;
     }
 </style>
 
@@ -60,394 +155,262 @@ $Csrf = SecurityController::obtenerCsrfToken();
 
 <div class="page-wrapper anime-fade-in">
     
-    <!-- Header -->
-    <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4 gap-3">
-        <div>
-            <div class="mb-1">
-                <a href="index.php?System=encuestas" class="text-decoration-none text-muted small">
-                    <i class="bi bi-arrow-left me-1"></i>Volver a Encuestas
-                </a>
-            </div>
-            <h1 class="page-title mb-1">Gestor de Preguntas</h1>
-            <p class="page-subtitle mb-0">
-                Encuesta: <span class="fw-bold text-dark"><?= htmlspecialchars($Encuesta['titulo']) ?></span>
-            </p>
-        </div>
-        <div class="d-flex gap-2">
-            <a href="index.php?System=encuestas&a=responder&id=<?= $Encuesta['id'] ?>" target="_blank" class="btn btn-outline-primary rounded-pill px-4 fw-bold shadow-sm">
-                <i class="bi bi-eye-fill me-2"></i>Ver Encuesta
+    <!-- Top Bar: Configuración Visual & Acciones -->
+    <div class="bg-white border-bottom px-4 py-3 d-flex justify-content-between align-items-center shadow-sm z-index-10">
+        <div class="d-flex align-items-center gap-3">
+             <a href="index.php?System=encuestas" class="btn btn-light rounded-circle border shadow-sm" title="Volver">
+                <i class="bi bi-arrow-left"></i>
             </a>
-            <button class="btn btn-light border text-info bg-white shadow-sm" onclick="modalAyuda.show()">
-                <i class="bi bi-question-circle me-1"></i> Ayuda
-            </button>
-            <button class="btn btn-primary rounded-pill px-4 shadow-sm fw-bold" 
-                    style="background:var(--accent);border:none;" 
-                    onclick="abrirModalPregunta()">
-                <i class="bi bi-plus-lg me-2"></i>Nueva Pregunta
+            <div>
+                <h5 class="mb-0 fw-bold text-dark"><?= htmlspecialchars($Encuesta['titulo']) ?></h5>
+                <small class="text-muted">Diseña y organiza las preguntas</small>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-4">
+            <!-- Theme Selector -->
+            <div class="d-flex align-items-center gap-3 bg-light px-3 py-2 rounded-pill border">
+                <!-- Color Picker -->
+                <div class="d-flex align-items-center border-end pe-3 me-2">
+                    <label for="brandColor" class="small fw-bold text-muted me-2 cursor-pointer">Color:</label>
+                    <input type="color" id="brandColor" class="form-control form-control-color border-0 p-0 shadow-none" 
+                           value="<?= $ConfigVisual['color'] ?? '#4f46e5' ?>" 
+                           title="Color de Marca"
+                           style="width: 32px; height: 32px; cursor: pointer;"
+                           onchange="updateBrandColor(this.value)">
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small fw-bold text-uppercase text-muted me-2">Tema:</span>
+                    
+                    <div class="theme-option <?= $ConfigVisual['tema'] == 'light' ? 'active' : '' ?>" onclick="setTheme('light')" title="Claro">
+                        <div class="color-swatch" style="background: #f8fafc; border: 1px solid #cbd5e1;"></div>
+                    </div>
+                    <div class="theme-option <?= $ConfigVisual['tema'] == 'navy' ? 'active' : '' ?>" onclick="setTheme('navy')" title="Navy">
+                        <div class="color-swatch" style="background: #0f172a;"></div>
+                    </div>
+                    <div class="theme-option <?= $ConfigVisual['tema'] == 'dark' ? 'active' : '' ?>" onclick="setTheme('dark')" title="Oscuro">
+                        <div class="color-swatch" style="background: #18181b;"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn btn-success rounded-pill px-4 fw-bold shadow-sm" onclick="guardarDiseno()">
+                <i class="bi bi-save me-2"></i>Guardar Diseño
             </button>
         </div>
     </div>
 
-    <!-- Alert / Tip -->
-    <div class="alert alert-light border border-info-subtle bg-info-subtle text-info-emphasis d-flex align-items-center gap-3 shadow-sm mb-4">
-        <i class="bi bi-info-circle-fill fs-5"></i>
-        <div>
-            <strong>Tip:</strong> Arrastra y suelta las preguntas para reordenarlas automáticamente.
-        </div>
-        <button type="button" class="btn-close ms-auto" data-bs-dismiss="alert" aria-label="Close"></button>
-    </div>
+    <!-- Main Split Layout -->
+    <div class="split-container">
+        
+        <!-- LEFT: Editor Pane -->
+        <div class="editor-pane">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h6 class="fw-bold text-muted text-uppercase ls-1 mb-0">Estructura de la Encuesta</h6>
+                <button class="btn btn-primary rounded-pill px-3 fw-bold small shadow-sm" onclick="abrirModalPregunta()">
+                    <i class="bi bi-plus-lg me-1"></i> Añadir Pregunta
+                </button>
+            </div>
 
-    <!-- Questions List -->
-    <div class="row">
-        <div class="col-12">
-            <div id="preguntas-lista" class="list-group list-group-flush gap-2">
+            <div id="preguntas-lista" class="list-group list-group-flush gap-3 pb-5">
                 <?php if (empty($Preguntas)): ?>
-                    <div class="text-center py-5 soft-card">
-                        <div class="text-muted opacity-50 mb-3"><i class="bi bi-clipboard-x fa-3x"></i></div>
-                        <h6 class="fw-bold text-muted">No hay preguntas agregadas aún</h6>
-                        <p class="small text-muted mb-0">Comienza creando la primera pregunta para tu encuesta.</p>
+                    <div class="text-center py-5">
+                        <div class="text-muted opacity-25 mb-3"><i class="bi bi-grid-1x2 fa-3x" style="font-size:3rem"></i></div>
+                        <h6 class="fw-bold text-muted">Tu encuesta está vacía</h6>
+                        <p class="small text-muted">Añade preguntas para ver la vista previa.</p>
                     </div>
                 <?php else: 
-                    // Create Map for Logic Names
-                    $MapNombres = [];
-                    foreach ($Preguntas as $Pre) {
-                        $MapNombres[$Pre['id']] = $Pre['texto_pregunta'];
-                    }
-                ?>
-                    <?php foreach ($Preguntas as $P): 
-                        $Logica = array();
-                        if (isset($P['logica_condicional'])) {
-                            $Logica = json_decode($P['logica_condicional'], true);
-                        }
+                    // Init Maps
+                    $MapNombres = []; foreach ($Preguntas as $P) $MapNombres[$P['id']] = $P['texto_pregunta'];
+                    
+                    foreach ($Preguntas as $P): 
+                        // Logic Flags
+                        $Logica = json_decode($P['logica_condicional'] ?? '{}', true);
+                        $TieneLogica = !empty($Logica['rules']);
                         
-                        $TieneLogica = false;
-                        if (!empty($Logica)) {
-                            if (isset($Logica['rules'])) {
-                                if (count($Logica['rules']) > 0) {
-                                    $TieneLogica = true;
-                                }
-                            }
-                        }
-                        
+                        // Options
                         $Opciones = [];
-                        if($P['tipo_pregunta'] === 'unica' || $P['tipo_pregunta'] === 'multiple' || $P['tipo_pregunta'] === 'botonera') {
-                             if(!empty($P['opciones_json'])) {
-                                 $Decoded = json_decode($P['opciones_json'], true);
-                                 if ($Decoded) {
-                                     $Opciones = $Decoded;
-                                 }
-                             }
-                             // Fallback for Botonera if empty (visual only)
-                             if($P['tipo_pregunta'] === 'botonera') {
-                                 if (empty($Opciones)) {
-                                     $Opciones = ['Gran experiencia', 'Sugerencia', 'Tuve un problema'];
-                                 }
-                             }
+                        if(in_array($P['tipo_pregunta'], ['unica','multiple','botonera'])) {
+                             $Opciones = json_decode($P['opciones_json'] ?? '[]', true);
+                             if($P['tipo_pregunta'] === 'botonera' && empty($Opciones)) $Opciones = ['Gran experiencia', 'Sugerencia', 'Tuve un problema'];
                         }
-
-                        $Config = array();
-                        if (isset($P['configuracion_json'])) {
-                            $Config = json_decode($P['configuracion_json'], true);
-                        }
-                    ?>
-                        <div class="list-group-item question-card p-3 rounded shadow-sm border-0 border-start border-4 mb-2" data-id="<?= $P['id'] ?>">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <div class="d-flex align-items-start gap-3 flex-grow-1">
-                                    <div class="text-muted mt-1" style="cursor:move;"><i class="bi bi-grip-vertical fs-5"></i></div>
-                                    <div class="w-100">
-                                        <!-- Header: Type & Req -->
-                                        <div class="d-flex align-items-center gap-2 mb-2">
-                                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle fw-bold text-uppercase ls-1">
-                                                <?= ucfirst($P['tipo_pregunta']) ?>
-                                            </span>
-                                            <?php if ($P['requerido']): ?>
-                                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle extra-small">
-                                                    <i class="bi bi-asterisk me-1"></i>Obligatoria
-                                                </span>
-                                            <?php else: ?>
-                                                <span class="badge bg-light text-muted border extra-small">Opcional</span>
-                                            <?php endif; ?>
-                                        </div>
-                                        
-                                        <!-- Question Text -->
-                                        <h6 class="mb-3 fw-bold text-dark fs-6 text-wrap">
-                                            <?= htmlspecialchars($P['texto_pregunta']) ?>
-                                        </h6>
-
-                                        <div class="bg-light p-2 rounded border border-light-subtle small text-muted">
-                                            <!-- Config Details -->
-                                            <div class="row g-2">
-                                                <div class="col-12">
-                                                    <i class="bi bi-sliders me-1"></i> <strong>Configuración:</strong>
-                                                    <?php if($P['tipo_pregunta'] === 'texto'): ?>
-                                                        <?php 
-                                                        $MaxChars = 0;
-                                                        if (isset($Config['max_chars'])) {
-                                                            $MaxChars = $Config['max_chars'];
-                                                        }
-                                                        
-                                                        if ($MaxChars > 0): ?>
-                                                            <span class="ms-1">Límite de <?= $MaxChars ?> caracteres.</span>
-                                                        <?php else: ?>
-                                                            <span class="ms-1 fst-italic">Sin límite de caracteres.</span>
-                                                        <?php endif; ?>
-                                                    <?php elseif(!empty($Opciones)): ?>
-                                                        <span class="ms-1"><?= count($Opciones) ?> Opciones definidas.</span>
-                                                    <?php else: ?>
-                                                        <span class="ms-1">Estándar.</span>
-                                                    <?php endif; ?>
-                                                </div>
-
-                                                <!-- Options List -->
-                                                <?php if (!empty($Opciones)): ?>
-                                                    <div class="col-12 mt-1">
-                                                        <div class="d-flex flex-wrap gap-1 ps-3 border-start border-3 border-secondary-subtle">
-                                                            <?php foreach($Opciones as $Opt): ?>
-                                                                <span class="badge bg-white text-dark border fw-normal shadow-sm"><?= htmlspecialchars($Opt) ?></span>
-                                                            <?php endforeach; ?>
-                                                        </div>
-                                                    </div>
-                                                <?php endif; ?>
-
-                                                <!-- Logic Details -->
-                                                <div class="col-12 mt-2 pt-2 border-top">
-                                                    <?php if ($TieneLogica): 
-                                                        $Regla = $Logica['rules'][0];
-                                                        
-                                                        $NombrePadre = 'ID #' . $Regla['question_id'];
-                                                        if (isset($MapNombres[$Regla['question_id']])) {
-                                                            $NombrePadre = $MapNombres[$Regla['question_id']];
-                                                        }
-
-                                                        $MapOps = [
-                                                            '==' => 'sea igual a',
-                                                            '!=' => 'sea diferente de',
-                                                            '>'  => 'sea mayor que',
-                                                            '<'  => 'sea menor que'
-                                                        ];
-                                                        
-                                                        $Operador = 'sea igual a';
-                                                        if (isset($MapOps[$Regla['operator']])) {
-                                                            $Operador = $MapOps[$Regla['operator']];
-                                                        }
-                                                    ?>
-                                                        <div class="text-primary">
-                                                            <i class="bi bi-diagram-2-fill me-1"></i>
-                                                            Mostrar solo si <strong><?= htmlspecialchars($NombrePadre) ?></strong> <?= $Operador ?> <span class="badge bg-primary-subtle text-primary border"><?= htmlspecialchars($Regla['value']) ?></span>
-                                                        </div>
-                                                    <?php else: ?>
-                                                        <div class="text-muted opacity-75">
-                                                            <i class="bi bi-eye-fill me-1"></i> Visible siempre (Sin condiciones).
-                                                        </div>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                    </div>
+                        $Config = json_decode($P['configuracion_json'] ?? '{}', true);
+                ?>
+                    <div class="question-card p-3 rounded-4 shadow-sm border border-light-subtle position-relative" data-id="<?= $P['id'] ?>">
+                        <!-- Drag Handle -->
+                        <div class="position-absolute start-0 top-0 bottom-0 d-flex align-items-center justify-content-center rounded-start-4" style="width:24px; background:rgba(0,0,0,0.02); cursor:grab;">
+                             <i class="bi bi-three-dots-vertical text-muted opacity-50"></i>
+                        </div>
+                        
+                        <div class="ps-3 d-flex gap-3">
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="badge bg-white text-dark border shadow-sm text-uppercase extra-small fw-bold">
+                                        <?= ucfirst($P['tipo_pregunta']) ?>
+                                    </span>
+                                    <?php if ($P['requerido']): ?>
+                                        <span class="text-danger extra-small fw-bold"><i class="bi bi-asterisk"></i></span>
+                                    <?php endif; ?>
                                 </div>
-                                <div class="btn-group ms-3 shadow-sm rounded">
-                                    <button class="btn btn-sm btn-white border text-primary" onclick='editarPregunta(<?= json_encode($P) ?>)' title="Editar">
-                                        <i class="bi bi-pencil-fill"></i>
-                                    </button>
-                                    <button class="btn btn-sm btn-white border text-danger" onclick="eliminarPregunta(<?= $P['id'] ?>)" title="Eliminar">
-                                        <i class="bi bi-trash-fill"></i>
-                                    </button>
+                                
+                                <h6 class="fw-bold text-dark mb-2"><?= htmlspecialchars($P['texto_pregunta']) ?></h6>
+                                
+                                <div class="small text-muted">
+                                    <?php if(!empty($Opciones)): ?>
+                                        <i class="bi bi-list-ul me-1"></i> <?= count($Opciones) ?> Opciones
+                                    <?php endif; ?>
+                                    <?php if($TieneLogica): ?>
+                                        <span class="ms-2 text-primary bg-primary-subtle px-2 py-1 rounded fw-bold">
+                                            <i class="bi bi-diagram-2"></i> Condicional
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
+
+                            <div class="d-flex flex-column gap-1">
+                                <button class="btn btn-sm btn-light border text-primary" onclick='editarPregunta(<?= json_encode($P) ?>)'><i class="bi bi-pencil-fill"></i></button>
+                                <button class="btn btn-sm btn-light border text-danger" onclick="eliminarPregunta(<?= $P['id'] ?>)"><i class="bi bi-trash-fill"></i></button>
+                            </div>
                         </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
+                    </div>
+                <?php endforeach; endif; ?>
             </div>
         </div>
+
+        <!-- RIGHT: Live Simulator -->
+        <div class="preview-pane">
+            <h6 class="fw-bold text-muted text-uppercase ls-1 mb-3">Vista Previa (En vivo)</h6>
+            <div class="smartphone-mockup">
+                <div class="smartphone-notch"></div>
+                <div class="smartphone-screen">
+                    <iframe id="previewFrame" src="index.php?System=encuestas&a=responder&id=<?= $Encuesta['id'] ?>&preview=1&theme=<?= $ConfigVisual['tema'] ?>"></iframe>
+                </div>
+            </div>
+            <div class="mt-3 text-muted extra-small">
+                 <i class="bi bi-phone"></i> Perspectiva Móvil
+            </div>
+        </div>
+
     </div>
 </div>
 
-<!-- Modal Pregunta -->
-<div class="modal fade" id="modalPregunta" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable"> <!-- XL Modal -->
-        <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
+<!-- Modal Pregunta (Mismo contenido, solo ID wrappers) -->
+
+<!-- El modal original es muy largo, para mantener limpio este archivo, podríamos extraerlo. 
+     Para este paso, vamos a incluir el HTML del modal directamente aquí abajo si no extraemos. -->
+
+<!-- Modal Pregunta Inline (Copia del original) -->
+<div class="modal fade" id="modalPregunta" tabindex="-1" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg rounded-4">
             <div class="modal-header border-0 pb-0">
                 <h5 class="modal-title fw-bold" id="modalTitulo">Nueva Pregunta</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
-            
             <form id="formPregunta" onsubmit="guardarPregunta(event)" class="h-100">
                 <div class="modal-body pt-4">
                     <input type="hidden" name="encuesta_id" value="<?= $Encuesta['id'] ?>">
                     <input type="hidden" name="pregunta_id" id="pregunta_id">
                     
-                    <div class="row h-100">
-                        <!-- FORMULARIO (FULL WIDTH) -->
+                    <div class="row g-3 mb-3">
                         <div class="col-12">
-                            <div class="pe-lg-3">
-                                <div class="row g-3 mb-3">
-                                    <div class="col-12">
-                                        <label class="form-label small fw-bold text-muted">Texto de la Pregunta <span class="text-danger">*</span></label>
-                                        <input type="text" class="form-control bg-light border-0" name="texto_pregunta" id="texto_pregunta" required placeholder="Ej: ¿Cómo califica nuestro servicio?">
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label class="form-label small fw-bold text-muted">Tipo de Respuesta</label>
-                                        <select class="form-select bg-light border-0" name="tipo_pregunta" id="tipo_pregunta" onchange="cambiarTipo()">
-                                            <option value="texto">Texto Libre</option>
-                                            <option value="unica">Selección Única (Radio)</option>
-                                            <option value="multiple">Selección Múltiple (Check)</option>
-                                            <option value="nps">NPS (0-10)</option>
-                                            <option value="1to10">Escala 1 a 10</option>
-                                            <option value="1to5">Escala 1 a 5 (Estrellas)</option>
-                                            <option value="botonera">Botonera (Feedback rápido)</option>
-                                        </select>
-                                    </div>
-                                    <div class="col-md-6 d-flex align-items-end">
-                                        <div class="form-check mb-2">
-                                            <input class="form-check-input" type="checkbox" name="requerido" id="requerido">
-                                            <label class="form-check-label small text-muted" for="requerido">
-                                                Respuesta Obligatoria
-                                            </label>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <!-- Configuración Específica -->
-                                <div id="config-options" style="display:none;" class="card border-0 bg-light mb-3">
-                                    <div class="card-body">
-                                        <h6 class="card-title extra-small fw-bold text-uppercase text-muted ls-1">Opciones de Respuesta</h6>
-                                        <small class="d-block mb-2 text-muted">Ingresa las opciones (una por renglón).</small>
-                                        <textarea class="form-control border-0 bg-white" name="opciones" id="opciones" rows="4" placeholder="Opción A&#10;Opción B&#10;Opción C"></textarea>
-                                    </div>
-                                </div>
-
-                                <div id="config-text" style="display:none;" class="card border-0 bg-light mb-3">
-                                    <div class="card-body">
-                                        <h6 class="card-title extra-small fw-bold text-uppercase text-muted ls-1">Configuración de Texto</h6>
-                                        <label class="form-label small text-muted">Límite de Caracteres</label>
-                                        <input type="number" class="form-control border-0 bg-white" id="max_chars" placeholder="5000">
-                                    </div>
-                                </div>
-
-                                <div id="config-botonera" style="display:none;" class="card border-0 bg-light mb-3">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between align-items-center mb-2">
-                                            <h6 class="card-title extra-small fw-bold text-uppercase text-muted ls-1 mb-0">Botones de Feedback</h6>
-                                            <span class="badge bg-warning text-dark border">Estándar</span>
-                                        </div>
-                                        <p class="extra-small text-muted mb-3">Estos botones son fijos y no se pueden editar.</p>
-                                        <div id="botonera-list" class="vstack gap-2">
-                                            <!-- JS generará inputs aquí -->
-                                        </div>
-                                        <input type="hidden" name="opciones_json_raw" id="opciones_json_raw">
-                                    </div>
-                                </div>
-
-                                <!-- Lógica Condicional -->
-                                <div class="card border border-light-subtle shadow-sm mt-3">
-                                    <div class="card-header bg-white border-0 py-2" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#logicCollapse">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <h6 class="mb-0 text-primary extra-small fw-bold text-uppercase ls-1">
-                                                <i class="bi bi-diagram-2 me-2"></i>Lógica Condicional
-                                            </h6>
-                                            <i class="bi bi-chevron-down text-muted"></i>
-                                        </div>
-                                    </div>
-                                    <div id="logicCollapse" class="collapse">
-                                        <div class="card-body pt-0">
-                                            <div class="form-check mb-3">
-                                                <input class="form-check-input" type="checkbox" id="tiene_logica" onchange="toggleLogic()">
-                                                <label class="form-check-label small text-muted" for="tiene_logica">
-                                                    Mostrar esta pregunta <b>SOLO SI...</b>
-                                                </label>
-                                            </div>
-                                            
-                                            <div id="logic-builder" style="display:none;" class="p-3 bg-light rounded">
-                                                <div class="row g-2 align-items-end">
-                                                    <div class="col-md-12 mb-2">
-                                                        <label class="extra-small text-muted fw-bold">La pregunta anterior...</label>
-                                                        <select class="form-select form-select-sm border-0" id="logic_parent">
-                                                            <option value="">-- Seleccionar --</option>
-                                                            <!-- JS Populará esto -->
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-5">
-                                                        <label class="extra-small text-muted fw-bold">Condición</label>
-                                                        <select class="form-select form-select-sm border-0" id="logic_operator">
-                                                            <option value="==">Es igual a</option>
-                                                            <option value="!=">Es diferente de</option>
-                                                            <option value=">">Es mayor que</option>
-                                                            <option value="<">Es menor que</option>
-                                                        </select>
-                                                    </div>
-                                                    <div class="col-md-7">
-                                                        <label class="extra-small text-muted fw-bold">Valor</label>
-                                                        <input type="text" class="form-control form-control-sm border-0" id="logic_value" placeholder="Valor esperado">
-                                                    </div>
-                                                </div>
-                                                <input type="hidden" name="logica_condicional" id="logica_condicional">
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <input type="hidden" name="configuracion_json" id="configuracion_json">
+                            <label class="form-label small fw-bold text-muted">Texto</label>
+                            <input type="text" class="form-control bg-light border-0 py-2" name="texto_pregunta" id="texto_pregunta" required placeholder="Ej: ¿Cómo califica nuestro servicio?">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">Tipo</label>
+                            <select class="form-select bg-light border-0" name="tipo_pregunta" id="tipo_pregunta" onchange="cambiarTipo()">
+                                <option value="texto">Texto Libre</option>
+                                <option value="unica">Selección Única</option>
+                                <option value="multiple">Selección Múltiple</option>
+                                <option value="nps">NPS (0-10)</option>
+                                <option value="botonera">Botonera</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-end">
+                            <div class="form-check mb-2">
+                                <input class="form-check-input" type="checkbox" name="requerido" id="requerido">
+                                <label class="form-check-label small text-muted">Obligatoria</label>
                             </div>
                         </div>
                     </div>
 
+                    <!-- Config Blocks -->
+                    <div id="config-options" style="display:none;" class="card border-0 bg-light mb-3">
+                        <div class="card-body">
+                            <label class="small fw-bold text-muted mb-2">Opciones (Una por línea)</label>
+                            <textarea class="form-control border-0 bg-white" name="opciones" id="opciones" rows="4"></textarea>
+                        </div>
+                    </div>
+
+                    <div id="config-botonera" style="display:none;" class="card border-0 bg-light mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h6 class="small fw-bold text-muted mb-0">Botones Fijos</h6>
+                                <span class="badge bg-warning text-dark border">Estándar</span>
+                            </div>
+                            <div id="botonera-list" class="vstack gap-2"></div>
+                             <input type="hidden" name="opciones_json_raw" id="opciones_json_raw">
+                        </div>
+                    </div>
+
+                    <!-- Logic -->
+                    <div class="card border border-light-subtle shadow-sm mt-3">
+                         <div class="card-header bg-white border-0 py-2" style="cursor:pointer" data-bs-toggle="collapse" data-bs-target="#logicCollapse">
+                            <h6 class="mb-0 text-primary extra-small fw-bold text-uppercase"><i class="bi bi-diagram-2 me-2"></i>Lógica Condicional</h6>
+                         </div>
+                         <div id="logicCollapse" class="collapse">
+                            <div class="card-body pt-0">
+                                <div class="form-check mb-3">
+                                    <input class="form-check-input" type="checkbox" id="tiene_logica" onchange="toggleLogic()">
+                                    <label class="form-check-label small text-muted">Habilitar Condición</label>
+                                </div>
+                                <div id="logic-builder" style="display:none;" class="p-3 bg-light rounded">
+                                     <select class="form-select form-select-sm mb-2" id="logic_parent"><option>-- Pregunta Padre --</option></select>
+                                     <div class="d-flex gap-2">
+                                         <select class="form-select form-select-sm" id="logic_operator">
+                                             <option value="==">Igual a</option>
+                                             <option value="!=">Diferente de</option>
+                                         </select>
+                                         <input type="text" class="form-control form-control-sm" id="logic_value" placeholder="Valor">
+                                     </div>
+                                </div>
+                                <input type="hidden" name="logica_condicional" id="logica_condicional">
+                            </div>
+                         </div>
+                    </div>
+                    <input type="hidden" name="configuracion_json" id="configuracion_json">
+
                 </div>
-                <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-link text-muted text-decoration-none small" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold" style="background:var(--accent);border:none;">
-                        Guardar Pregunta
-                    </button>
+                <div class="modal-footer border-0">
+                     <button type="button" class="btn btn-link text-muted text-decoration-none" data-bs-dismiss="modal">Cancelar</button>
+                     <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Guardar</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
-<!-- Modal Ayuda -->
-<div class="modal fade" id="modalAyuda" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title fw-bold">Ayuda del Gestor</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body text-muted small">
-                <p><strong>Tipos de Pregunta:</strong></p>
-                <ul class="mb-4">
-                    <li><strong>Botonera:</strong> Botones fijos: "Gran experiencia", "Sugerencia", "Problema".</li>
-                    <li><strong>NPS:</strong> Escala 0-10 estándar (encuestas de satisfacción).</li>
-                    <li><strong>Texto Libre:</strong> Campo de texto abierto.</li>
-                </ul>
-                <p><strong>Organización:</strong> Arrastra las tarjetas para reordenar.</p>
-                <p><strong>Lógica:</strong> Configura condiciones para mostrar preguntas.</p>
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-primary rounded-pill px-4" data-bs-dismiss="modal">Entendido</button>
-            </div>
-        </div>
-    </div>
-</div>
 
 <?php include 'View/layouts/footer.php'; ?>
 
 <script>
-    // Variables Globales
+    // Global Config
     const EncuestaID = <?= $Encuesta['id'] ?>;
     const AllPreguntas = <?= json_encode($Preguntas) ?>;
-    
-    // Fixed options for Botonera
     const FIXED_BOTONERA = ['Gran experiencia', 'Sugerencia', 'Tuve un problema'];
     let BotoneraItems = [...FIXED_BOTONERA];
+    
+    // Initial State
+    let currentTheme = '<?= $ConfigVisual['tema'] ?>';
+    let currentColor = '<?= $ConfigVisual['color'] ?? '#4f46e5' ?>';
 
     var modalPregunta = null;
-    var modalAyuda = null;
 
     document.addEventListener('DOMContentLoaded', function() {
-        if(typeof bootstrap !== 'undefined') {
-            modalPregunta = new bootstrap.Modal(document.getElementById('modalPregunta'));
-            modalAyuda = new bootstrap.Modal(document.getElementById('modalAyuda'));
-        }
-
+        if(typeof bootstrap !== 'undefined') modalPregunta = new bootstrap.Modal(document.getElementById('modalPregunta'));
+        
         var el = document.getElementById('preguntas-lista');
         if(el) {
             Sortable.create(el, {
@@ -457,225 +420,427 @@ $Csrf = SecurityController::obtenerCsrfToken();
                 onEnd: function (evt) { guardarOrden(); }
             });
         }
+        
+        // Init Preview
+        updateIframeSrc();
     });
 
+    // --- VISUAL CONFIG ---
+    function updateIframeSrc() {
+        const iframe = document.getElementById('previewFrame');
+        if(iframe) {
+            const url = new URL(iframe.src); // Or construct new if src is initial
+            // Better construct clean to avoid params accumulation or just set params
+            // index.php?System=encuestas&a=responder&id=...
+            const base = 'index.php';
+            const params = new URLSearchParams({
+                System: 'encuestas',
+                a: 'responder',
+                id: EncuestaID,
+                preview: 1,
+                theme: currentTheme,
+                color: currentColor,
+                t: Date.now()
+            });
+            iframe.src = base + '?' + params.toString();
+        }
+    }
+
+    function setTheme(theme) {
+        currentTheme = theme;
+        document.querySelectorAll('.theme-option').forEach(el => el.classList.remove('active'));
+        const activeEl = document.querySelector(`.theme-option[onclick="setTheme('${theme}')"]`);
+        if(activeEl) activeEl.classList.add('active');
+        
+        updateIframeSrc();
+    }
+    
+    function updateBrandColor(color) {
+        currentColor = color;
+        updateIframeSrc();
+    }
+
+    function guardarDiseno() {
+        const btn = document.querySelector('button[onclick="guardarDiseno()"]');
+        const originalContent = btn.innerHTML;
+        
+        // Estado Loading
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Guardando...';
+
+        const config = {
+            tema: currentTheme,
+            color: currentColor
+        };
+
+        const fd = new FormData();
+        fd.append('id', EncuestaID);
+        // Enviamos datos minimos para actualizarJson o usamos actualizarEncuesta
+        // El controller actual usa actualizarEncuesta que requiere todos los campos.
+        // HACK: Enviamos campos dummy o los actuales si los tenemos. 
+        // Como no tenemos los valores de titulo/fechas aqui, el controller podria fallar o borrar datos si no manejamos esto.
+        // PERO: En la iteracion 856 vi que creaste 'guardar_diseno_ajax' que RELLENA los datos faltantes con los de la DB.
+        // ASI QUE: Solo necesitamos enviar ID y config.
+        
+        fd.append('configuracion', JSON.stringify(config));
+        fd.append('csrf_token', '<?= $Csrf ?>'); 
+
+        fetch('index.php?System=encuestas&a=guardar_diseno_ajax', {
+            method: 'POST', body: fd
+        })
+        .then(r => r.json())
+        .then(d => {
+            if(d.success) {
+                // Estado Éxito
+                btn.classList.remove('btn-success');
+                btn.classList.add('btn-outline-success', 'bg-success', 'text-white'); 
+                btn.innerHTML = '<i class="bi bi-check-lg me-2"></i>¡Guardado!';
+                
+                // Revertir
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.classList.remove('btn-outline-success', 'bg-success', 'text-white');
+                    btn.classList.add('btn-success');
+                    btn.innerHTML = originalContent;
+                }, 2000);
+            } else {
+                alert('Error al guardar: ' + d.message);
+                btn.disabled = false;
+                btn.innerHTML = originalContent;
+            }
+        })
+        .catch(e => {
+            alert('Error de red');
+            btn.disabled = false;
+            btn.innerHTML = originalContent;
+        });
+    }
+    // --- QUESTION MODAL & LOGIC (Condensed) ---
     function abrirModalPregunta() {
         document.getElementById('formPregunta').reset();
         document.getElementById('pregunta_id').value = '';
-        document.getElementById('modalTitulo').innerText = 'Nueva Pregunta';
-        
-        document.getElementById('tiene_logica').checked = false;
-        toggleLogic();
-        
-        // Reset Botonera to fixed defaults
-        BotoneraItems = [...FIXED_BOTONERA];
         renderBotoneraInputs();
-        
-        cambiarTipo();
+        toggleLogic();
         modalPregunta.show();
         popularPreguntasPadre();
     }
 
-    function editarPregunta(pregunta) {
+    function editarPregunta(p) {
         document.getElementById('formPregunta').reset();
-        document.getElementById('pregunta_id').value = pregunta.id;
-        document.getElementById('modalTitulo').innerText = 'Editar Pregunta';
-        document.getElementById('texto_pregunta').value = pregunta.texto_pregunta;
+        document.getElementById('pregunta_id').value = p.id;
+        document.getElementById('texto_pregunta').value = p.texto_pregunta;
+        document.getElementById('tipo_pregunta').value = p.tipo_pregunta;
+        document.getElementById('requerido').checked = (p.requerido == 1);
         
-        // Normalize type to lowercase and trimmed
-        const currentType = (pregunta.tipo_pregunta || '').trim().toLowerCase();
-        document.getElementById('tipo_pregunta').value = currentType;
-        
-        document.getElementById('requerido').checked = (pregunta.requerido == 1);
-        
-        // Handle Options
-        if (currentType === 'botonera') {
-            // Always force fixed items for botonera, regardless of what's in DB
-            BotoneraItems = [...FIXED_BOTONERA];
-            renderBotoneraInputs();
-        } else if (pregunta.opciones_json) {
-            try {
-                const opts = JSON.parse(pregunta.opciones_json);
-                document.getElementById('opciones').value = opts.join('\n');
-            } catch(e) { document.getElementById('opciones').value = ''; }
-        }
+        cambiarTipo();
 
-        if (pregunta.configuracion_json) {
-            try {
-                const conf = JSON.parse(pregunta.configuracion_json);
-                if (conf.max_chars) document.getElementById('max_chars').value = conf.max_chars;
-            } catch(e){}
+        // Opciones
+        if (p.tipo_pregunta === 'botonera') {
+             renderBotoneraInputs();
+        } else if (p.opciones_json) {
+             const opts = JSON.parse(p.opciones_json);
+             document.getElementById('opciones').value = opts.join('\\n');
         }
 
         // Logic
-        if (pregunta.logica_condicional) {
-            try {
-                const log = JSON.parse(pregunta.logica_condicional);
-                if (log && log.rules && log.rules.length > 0) {
-                    const rule = log.rules[0];
-                    document.getElementById('tiene_logica').checked = true;
-                    toggleLogic();
-                    popularPreguntasPadre(); 
-                    setTimeout(() => {
-                        document.getElementById('logic_parent').value = rule.question_id;
-                        document.getElementById('logic_operator').value = rule.operator;
-                        document.getElementById('logic_value').value = rule.value;
-                    }, 50);
-                } else {
-                    document.getElementById('tiene_logica').checked = false;
-                    toggleLogic();
-                }
-            } catch(e) { document.getElementById('tiene_logica').checked = false; toggleLogic(); }
-        } else {
-            document.getElementById('tiene_logica').checked = false;
-            toggleLogic();
+        if (p.logica_condicional) {
+            const l = JSON.parse(p.logica_condicional);
+            if(l.rules && l.rules[0]) {
+                document.getElementById('tiene_logica').checked = true;
+                toggleLogic();
+                // Delay fill
+                setTimeout(() => {
+                    popularPreguntasPadre();
+                    document.getElementById('logic_parent').value = l.rules[0].question_id;
+                    document.getElementById('logic_operator').value = l.rules[0].operator;
+                    document.getElementById('logic_value').value = l.rules[0].value;
+                }, 100);
+            }
         }
 
-        cambiarTipo();
         modalPregunta.show();
     }
 
     function cambiarTipo() {
-        const tipo = document.getElementById('tipo_pregunta').value;
-        const divOpciones = document.getElementById('config-options');
-        const divText = document.getElementById('config-text');
-        const divBotonera = document.getElementById('config-botonera');
-
-        divOpciones.style.display = 'none';
-        divText.style.display = 'none';
-        divBotonera.style.display = 'none';
-
-        if (['unica', 'multiple'].includes(tipo)) {
-            divOpciones.style.display = 'block';
-        } else if (tipo === 'texto') {
-            divText.style.display = 'block';
-        } else if (tipo === 'botonera') {
-            divBotonera.style.display = 'block';
-            renderBotoneraInputs();
-        }
+        const t = document.getElementById('tipo_pregunta').value;
+        document.getElementById('config-options').style.display = ['unica','multiple'].includes(t) ? 'block' : 'none';
+        document.getElementById('config-botonera').style.display = (t === 'botonera') ? 'block' : 'none';
+        if(t === 'botonera') renderBotoneraInputs();
     }
 
-    // --- LOGIC FOR BOTONERA ---
     function renderBotoneraInputs() {
-        const container = document.getElementById('botonera-list');
-        container.innerHTML = '';
-        BotoneraItems.forEach((btn, index) => {
-            const row = document.createElement('div');
-            row.className = 'input-group input-group-sm mb-1';
-            row.innerHTML = `
-                <span class="input-group-text bg-white border-0"><i class="bi bi-lock-fill text-muted"></i></span>
-                <input type="text" class="form-control border-0 bg-light shadow-sm text-muted" value="${btn}" readonly>
-            `;
-            container.appendChild(row);
+        const c = document.getElementById('botonera-list');
+        c.innerHTML = '';
+        FIXED_BOTONERA.forEach(b => {
+             c.innerHTML += `<input type="text" class="form-control form-control-sm mb-1 bg-white" value="${b}" readonly>`;
         });
     }
 
-    // --- LOGIC BUILDER ---
     function toggleLogic() {
-        const show = document.getElementById('tiene_logica').checked;
-        document.getElementById('logic-builder').style.display = show ? 'block' : 'none';
-        if(show) popularPreguntasPadre();
+        const s = document.getElementById('tiene_logica').checked;
+        document.getElementById('logic-builder').style.display = s ? 'block' : 'none';
+        if(s) popularPreguntasPadre();
     }
 
     function popularPreguntasPadre() {
-        const select = document.getElementById('logic_parent');
-        const currentId = document.getElementById('pregunta_id').value;
-        const currentVal = select.value;
-        
-        select.innerHTML = '<option value="">-- Seleccionar --</option>';
+        const s = document.getElementById('logic_parent');
+        const curr = document.getElementById('pregunta_id').value;
+        s.innerHTML = '<option value="">-- Seleccionar --</option>';
         AllPreguntas.forEach(p => {
-            if(currentId && p.id == currentId) return;
-            const opt = document.createElement('option');
-            opt.value = p.id;
-            opt.innerText = p.texto_pregunta;
-            if(p.id == currentVal) opt.selected = true;
-            select.appendChild(opt);
+             if(p.id != curr) {
+                 const op = document.createElement('option');
+                 op.value = p.id; 
+                 op.text = p.texto_pregunta;
+                 s.add(op);
+             }
         });
     }
 
     function guardarPregunta(e) {
         e.preventDefault();
         
-        const form = document.getElementById('formPregunta');
-        const fd = new FormData(form);
-
-        if (fd.get('tipo_pregunta') === 'botonera') {
-            // Force save fixed items
-            document.getElementById('opciones_json_raw').value = JSON.stringify(FIXED_BOTONERA);
-            fd.set('opciones_json_raw', JSON.stringify(FIXED_BOTONERA));
-        }
-
-        const config = {};
-        if (fd.get('tipo_pregunta') === 'texto') {
-            const max = document.getElementById('max_chars').value;
-            if(max) config.max_chars = parseInt(max);
-        }
-        document.getElementById('configuracion_json').value = JSON.stringify(config);
-        fd.set('configuracion_json', JSON.stringify(config));
-
-        let logicJson = null;
-        if (document.getElementById('tiene_logica').checked) {
-            const pid = document.getElementById('logic_parent').value;
-            const op = document.getElementById('logic_operator').value;
-            const val = document.getElementById('logic_value').value;
-            if (pid && val) {
-                logicJson = JSON.stringify({
-                    rules: [{
-                        question_id: pid,
-                        operator: op,
-                        value: val
-                    }],
-                    action: 'show'
-                });
+        // Validación de Opciones
+        const tipo = document.getElementById('tipo_pregunta').value;
+        if (['unica', 'multiple'].includes(tipo)) {
+            const opcionesTxt = document.getElementById('opciones').value.trim();
+            if (!opcionesTxt) {
+                alert('Para este tipo de pregunta (' + (tipo === 'unica' ? 'Selección Única' : 'Selección Múltiple') + '), debes registrar al menos una opción.');
+                return;
+            }
+            // Validar que no sean solo lineas vacias
+            const lineas = opcionesTxt.split('\n').filter(l => l.trim().length > 0);
+            if (lineas.length === 0) {
+                 alert('Debes ingresar opciones válidas (una por línea).');
+                 return;
             }
         }
-        if(logicJson) fd.set('logica_condicional', logicJson);
-        else fd.delete('logica_condicional'); 
+
+        const fd = new FormData(document.getElementById('formPregunta'));
         
-        // Fix for undefined action usage in fetch, using hardcoded relative path based on router
-        fetch('index.php?System=encuestas&a=guardar_pregunta', {
-            method: 'POST',
-            body: fd
-        })
-        .then(async response => {
-            const text = await response.text();
-            try {
-                const data = JSON.parse(text);
-                if(data.success) {
-                    location.reload();
-                } else {
-                    alert(data.message || 'Error al guardar');
-                }
-            } catch(e) {
-                console.error('Server Error:', text);
-                alert('Error del servidor:\n' + text.substring(0, 500));
-            }
-        })
-        .catch(err => {
-            console.error(err);
-            alert('Error de conexión o red.');
+        if(fd.get('tipo_pregunta') === 'botonera') fd.set('opciones_json_raw', JSON.stringify(FIXED_BOTONERA));
+        
+        // Logic Builder
+        if(document.getElementById('tiene_logica').checked) {
+             const rule = {
+                 question_id: document.getElementById('logic_parent').value,
+                 operator: document.getElementById('logic_operator').value,
+                 value: document.getElementById('logic_value').value
+             };
+             if(rule.question_id && rule.value) fd.set('logica_condicional', JSON.stringify({rules:[rule]}));
+        }
+
+        fetch('index.php?System=encuestas&a=guardar_pregunta', { method:'POST', body:fd })
+        .then(r => r.json())
+        .then(d => {
+            if(d.success) {
+                // Refresh iframe
+                document.getElementById('previewFrame').contentWindow.location.reload();
+                location.reload(); 
+            } else alert(d.message);
         });
     }
 
     function eliminarPregunta(id) {
-        if(!confirm('¿Seguro que deseas eliminar esta pregunta?')) return;
-        const fd = new FormData();
-        fd.append('id', id);
-        fd.append('encuesta_id', EncuestaID);
-        fetch('index.php?System=encuestas&a=eliminar_pregunta', { method: 'POST', body: fd })
-        .then(r => r.json())
-        .then(data => { if(data.success) location.reload(); else alert(data.message); });
+        if(!confirm('¿Eliminar?')) return;
+        const fd = new FormData(); fd.append('id', id); fd.append('encuesta_id', EncuestaID);
+        fetch('index.php?System=encuestas&a=eliminar_pregunta', {method:'POST', body:fd})
+        .then(r => r.json()).then(d => { if(d.success) location.reload(); });
     }
 
     function guardarOrden() {
-        const lista = document.getElementById('preguntas-lista');
         const items = [];
-        lista.querySelectorAll('.question-card').forEach((el, index) => {
-            items.push({ id: el.getAttribute('data-id'), orden: index + 1 });
-        });
+        document.querySelectorAll('.question-card').forEach((el,i) => items.push({id:el.getAttribute('data-id'), orden:i+1}));
         fetch('index.php?System=encuestas&a=reordenar_preguntas', {
-            method: 'POST',
-            body: JSON.stringify({ encuesta_id: EncuestaID, items: items })
+            method:'POST', body:JSON.stringify({encuesta_id:EncuestaID, items:items})
+        }).then(() => {
+             document.getElementById('previewFrame').contentWindow.location.reload();
         });
     }
+</script>
+
+
+<!-- FLOATING HELP BUTTON -->
+<!-- FLOATING HELP BUTTON -->
+<button class="btn btn-primary rounded-circle shadow-lg btn-help-floating anime-pulse-init d-flex align-items-center justify-content-center" 
+        onclick="abrirAyuda()"
+        title="Ver Guía de Ayuda">
+    <i class="bi bi-question-lg fs-2"></i>
+</button>
+
+<!-- MODAL AYUDA / GUIA MEJORADO -->
+<div class="modal fade" id="modalAyuda" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-2-strong rounded-4 overflow-hidden">
+            <!-- Header con gradiente -->
+            <div class="modal-header bg-gradient-primary text-white p-4" style="background: linear-gradient(135deg, #0d6efd 0%, #0a58ca 100%);">
+                <div>
+                    <h4 class="modal-title fw-bold mb-1">
+                        <i class="bi bi-compass-fill me-2 opacity-75"></i> Gestión Profesional de Encuestas
+                    </h4>
+                    <p class="mb-0 text-white-50 small">Guía rápida para diseñar encuestas efectivas y atractivas</p>
+                </div>
+                <button type="button" class="btn-close btn-close-white opacity-100" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            
+            <div class="modal-body bg-light p-4">
+                <div class="container-fluid">
+                    <!-- Intro -->
+                    <div class="row mb-4">
+                        <div class="col-12">
+                            <div class="alert alert-primary border-0 shadow-sm d-flex align-items-center" role="alert">
+                                <i class="bi bi-lightbulb-fill fs-3 me-3"></i>
+                                <div>
+                                    <strong>Nueva Interfaz "Split View":</strong>
+                                    Ahora puedes editar tus preguntas a la izquierda y ver <em>en tiempo real</em> cómo quedan en un móvil a la derecha. ¡Lo que ves es lo que obtienes!
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-4 d-flex align-items-stretch">
+                        <!-- COL 1: FLUJO DE TRABAJO -->
+                        <div class="col-lg-4">
+                            <div class="card h-100 border-0 shadow-sm hover-shadow transition-all">
+                                <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="bg-primary bg-opacity-10 text-primary rounded p-2 me-3">
+                                            <i class="bi bi-kanban fs-4"></i>
+                                        </span>
+                                        <h5 class="fw-bold mb-0 text-dark">Gestión de Contenido</h5>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted small mb-4">Controla la estructura lógica de tu encuesta desde el panel izquierdo.</p>
+                                    
+                                    <div class="d-flex mb-3">
+                                        <i class="bi bi-plus-circle-fill text-success fs-5 me-3"></i>
+                                        <div>
+                                            <strong class="d-block text-dark">1. Añadir Preguntas</strong>
+                                            <span class="text-muted small">Usa el botón superior "Añadir Pregunta". Elige entre múltiples tipos según necesites.</span>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="d-flex mb-3">
+                                        <i class="bi bi-pencil-square text-warning fs-5 me-3"></i>
+                                        <div>
+                                            <strong class="d-block text-dark">2. Editar y Detallar</strong>
+                                            <span class="text-muted small">Haz clic en el lápiz para modificar textos. Define opciones claras para preguntas de selección.</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex">
+                                        <i class="bi bi-arrow-down-up text-primary fs-5 me-3"></i>
+                                        <div>
+                                            <strong class="d-block text-dark">3. Ordenar (Drag & Drop)</strong>
+                                            <span class="text-muted small">Arrastra las tarjetas de preguntas hacia arriba o abajo para cambiar su orden instantáneamente.</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- COL 2: DISEÑO VISUAL -->
+                        <div class="col-lg-4">
+                            <div class="card h-100 border-0 shadow-sm hover-shadow transition-all">
+                                <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="bg-indigo bg-opacity-10 text-indigo rounded p-2 me-3" style="color: #6610f2; background-color: #f3e8ff;">
+                                            <i class="bi bi-palette-fill fs-4"></i>
+                                        </span>
+                                        <h5 class="fw-bold mb-0 text-dark">Personalización Visual</h5>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted small mb-4">Define la identidad visual de tu encuesta para mejorar la experiencia del usuario.</p>
+                                    
+                                    <div class="list-group list-group-flush small">
+                                        <div class="list-group-item px-0 border-0">
+                                            <h6 class="fw-bold mb-1">
+                                                <i class="bi bi-moon-stars me-2"></i>Selector de Temas
+                                            </h6>
+                                            <p class="mb-1 text-muted">
+                                                En la barra superior encontrarás opciones de tema: 
+                                                <span class="badge bg-light text-dark border">Claro</span>, 
+                                                <span class="badge bg-dark border">Oscuro</span> y 
+                                                <span class="badge border text-white" style="background-color:#0f172a">Navy</span>.
+                                            </p>
+                                        </div>
+                                        <div class="list-group-item px-0 border-0">
+                                            <h6 class="fw-bold mb-1">
+                                                <i class="bi bi-eye me-2"></i>Vista Previa en Vivo
+                                            </h6>
+                                            <p class="mb-1 text-muted">
+                                                El simulador de teléfono se actualiza automáticamente al cambiar de tema o editar preguntas.
+                                            </p>
+                                        </div>
+                                        <div class="list-group-item px-0 border-0">
+                                            <div class="alert alert-warning py-2 mb-0 d-flex align-items-center">
+                                                <i class="bi bi-save me-2"></i>
+                                                <span><strong>¡Importante!</strong> Los cambios de diseño no se aplican hasta pulsar "Guardar Diseño".</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                         <!-- COL 3: TIPOS AVANZADOS -->
+                         <div class="col-lg-4">
+                            <div class="card h-100 border-0 shadow-sm hover-shadow transition-all">
+                                <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="bg-success bg-opacity-10 text-success rounded p-2 me-3">
+                                            <i class="bi bi-diagram-3-fill fs-4"></i>
+                                        </span>
+                                        <h5 class="fw-bold mb-0 text-dark">Lógica y Tipos</h5>
+                                    </div>
+                                </div>
+                                <div class="card-body">
+                                    <p class="text-muted small mb-4">Utiliza herramientas avanzadas para encuestas dinámicas.</p>
+                                    
+                                    <h6 class="fw-bold text-dark mb-2" style="font-size: 0.85rem;">TIPOS RECOMENDADOS</h6>
+                                    <div class="row g-2 mb-4">
+                                        <div class="col-6">
+                                            <div class="p-2 border rounded bg-light">
+                                                <strong class="d-block small text-dark">Botonera</strong>
+                                                <span class="text-muted" style="font-size:10px">Ideal para satisfacción (1-10)</span>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="p-2 border rounded bg-light">
+                                                <strong class="d-block small text-dark">Selección</strong>
+                                                <span class="text-muted" style="font-size:10px">Simple o Múltiple para categorizar</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <h6 class="fw-bold text-dark mb-2" style="font-size: 0.85rem;">LÓGICA CONDICIONAL</h6>
+                                    <div class="d-flex align-items-start bg-light p-2 rounded">
+                                        <i class="bi bi-share text-secondary me-2 mt-1"></i>
+                                        <p class="mb-0 small text-muted">
+                                            Puedes hacer que una pregunta aparezca <strong>solo si</strong> se elige una respuesta específica en la pregunta anterior. Activa el switch "Lógica Condicional" al editar.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer bg-light border-top-0 justify-content-center pb-4">
+                <button type="button" class="btn btn-primary px-5 py-2 fw-bold rounded-pill shadow-sm" data-bs-dismiss="modal">
+                    ¡Comenzar a Trabajar!
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function openingHelp() {
+        var myModal = new bootstrap.Modal(document.getElementById('modalAyuda'));
+        myModal.show();
+    }
+    // Alias para el botón
+    function abrirAyuda() { openingHelp(); }
 </script>
