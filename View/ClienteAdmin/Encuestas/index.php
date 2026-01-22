@@ -24,6 +24,7 @@ $Csrf = SecurityController::obtenerCsrfToken();
                 <thead class="bg-light">
                     <tr>
                         <th class="ps-4 py-3 text-uppercase text-muted extra-small fw-bold">Título</th>
+                        <th class="py-3 text-uppercase text-muted extra-small fw-bold" style="width: 100px;">Imagen</th>
                         <th class="py-3 text-uppercase text-muted extra-small fw-bold">Fechas</th>
                         <th class="py-3 text-uppercase text-muted extra-small fw-bold">Configuración</th>
                         <th class="py-3 text-uppercase text-muted extra-small fw-bold">Acciones</th>
@@ -32,22 +33,40 @@ $Csrf = SecurityController::obtenerCsrfToken();
                 <tbody>
                     <?php if (empty($Encuestas)): ?>
                         <tr>
-                            <td colspan="4" class="text-center py-5">
+                            <td colspan="5" class="text-center py-5">
                                 <span class="text-muted">No tienes encuestas registradas.</span>
                             </td>
                         </tr>
                     <?php else: ?>
                         <?php foreach ($Encuestas as $E): ?>
                             <tr>
-                                <td class="ps-4 py-3">
+                                <td class="ps-4 py-3 align-middle">
                                     <div class="fw-bold text-dark"><?php echo htmlspecialchars($E['titulo']); ?></div>
                                     <div class="extra-small text-muted"><?php echo htmlspecialchars(mb_strimwidth($E['descripcion'], 0, 50, "...")); ?></div>
                                 </td>
-                                <td class="py-3">
-                                    <div class="extra-small"><i class="bi bi-calendar-event me-1 text-muted"></i> <?php echo $E['fecha_inicio']; ?></div>
-                                    <div class="extra-small"><i class="bi bi-calendar-check me-1 text-muted"></i> <?php echo $E['fecha_fin']; ?></div>
+                                <td class="py-3 align-middle">
+                                    <?php if (!empty($E['imagen_header'])): ?>
+                                        <div class="rounded border overflow-hidden shadow-sm bg-light position-relative" style="width: 80px; height: 45px;">
+                                            <img src="<?php echo htmlspecialchars($E['imagen_header']); ?>" alt="Header" class="w-100 h-100 object-fit-cover">
+                                        </div>
+                                    <?php else: ?>
+                                        <div class="rounded border border-dashed bg-light d-flex align-items-center justify-content-center" style="width: 80px; height: 45px;">
+                                            <button class="btn btn-link text-decoration-none text-muted p-0" 
+                                                    onclick='abrirModalEditar(<?php echo json_encode($E); ?>)' 
+                                                    title="Subir Imagen">
+                                                <i class="bi bi-image"></i>
+                                            </button>
+                                        </div>
+                                    <?php endif; ?>
                                 </td>
-                                <td class="py-3">
+                                <td class="py-3 align-middle">
+                                    <div class="extra-small"><i class="bi bi-calendar-event me-1 text-muted"></i> <?php echo $E['fecha_inicio']; ?></div>
+                                    <div class="extra-small">
+                                        <i class="bi bi-calendar-check me-1 text-muted"></i> 
+                                        <?php echo $E['fecha_fin'] ? $E['fecha_fin'] : 'Sin límite'; ?>
+                                    </div>
+                                </td>
+                                <td class="py-3 align-middle">
                                     <div class="d-flex gap-2">
                                         <?php if(isset($E['anonima']) && $E['anonima'] == 1): ?>
                                             <span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Anónima</span>
@@ -62,8 +81,19 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                         <?php endif; ?>
                                     </div>
                                 </td>
-                                <td class="py-3">
-                                    <button class="btn btn-sm btn-light border text-muted"><i class="bi bi-three-dots-vertical"></i></button>
+                                <td class="py-3 text-end pe-4">
+                                    <div class="d-flex gap-2 justify-content-end">
+                                        <button class="btn btn-sm btn-light border text-primary" 
+                                                onclick='abrirModalEditar(<?php echo json_encode($E); ?>)' 
+                                                title="Editar Configuración">
+                                            <i class="bi bi-pencil-fill"></i>
+                                        </button>
+                                        <a href="index.php?System=encuestas&a=preguntas&id=<?php echo $E['id']; ?>" 
+                                           class="btn btn-sm btn-light border text-dark" 
+                                           title="Gestionar Preguntas">
+                                            <i class="bi bi-list-check"></i>
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -83,13 +113,61 @@ $Csrf = SecurityController::obtenerCsrfToken();
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             
-            <form id="formEncuesta" action="index.php?System=encuestas&a=guardar" method="POST" autocomplete="off">
+            <form id="formEncuesta" method="POST" autocomplete="off" enctype="multipart/form-data">
                 <input type="hidden" name="csrf_token" value="<?php echo $Csrf; ?>">
+                <input type="hidden" name="id" id="encuestaId" value="0">
+                <input type="hidden" name="action_url" id="actionUrl" value="index.php?System=encuestas&a=guardar">
                 
                 <div class="modal-body pt-4">
                     <div class="mb-3">
                         <label class="form-label small fw-bold text-muted">Título de la Encuesta <span class="text-danger">*</span></label>
                         <input type="text" class="form-control bg-light border-0" name="titulo" required placeholder="Ej. Satisfacción Cliente">
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">Imagen de Encabezado (Opcional)</label>
+                        <input type="file" class="form-control bg-light border-0" name="imagen_header" accept="image/*">
+                        <div class="form-text extra-small text-muted">Recomendado: 1200x300px (JPG, PNG).</div>
+                        <div id="preview-container" class="mt-2 d-none">
+                            <img id="img-preview" src="" alt="Vista previa" class="img-fluid rounded border shadow-sm" style="max-height:100px;">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Fecha Inicio <span class="text-danger">*</span></label>
+                            <input type="date" class="form-control bg-light border-0" name="fecha_inicio" value="<?php echo date('Y-m-d'); ?>" required>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label small fw-bold text-muted">Fecha Fin</label>
+                            <div class="input-group">
+                                <input type="date" class="form-control bg-light border-0" name="fecha_fin" id="fechaFin" value="<?php echo date('Y-m-d', strtotime('+1 month')); ?>" required>
+                            </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="sinLimite" name="sin_limite" value="1">
+                                <label class="form-check-label extra-small text-muted" for="sinLimite">
+                                    Sin fecha límite
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted d-block">Tipo de Encuesta</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="anonima" id="tipoReg" value="0" checked>
+                                <label class="form-check-label small text-muted" for="tipoReg">
+                                    Requiere Registro
+                                </label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="anonima" id="tipoAnon" value="1">
+                                <label class="form-check-label small text-muted" for="tipoAnon">
+                                    Anónima (Pública)
+                                </label>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -101,7 +179,7 @@ $Csrf = SecurityController::obtenerCsrfToken();
                     <div class="alert alert-light border border-light-subtle d-flex align-items-start gap-2 mb-0">
                         <i class="bi bi-info-circle text-primary mt-1"></i>
                         <div class="extra-small text-muted">
-                            Se creará con la configuración predeterminada (1 mes de duración, registro requerido). Podrás editar estos detalles después.
+                           Podrás editar estos detalles después.
                         </div>
                     </div>
                 </div>
@@ -133,21 +211,120 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     initModal();
 
+    // Lógica Sin Límite
+    const checkSinLimite = document.getElementById('sinLimite');
+    const inputFechaFin = document.getElementById('fechaFin');
+    
+    if(checkSinLimite && inputFechaFin) {
+        checkSinLimite.addEventListener('change', function() {
+            if(this.checked) {
+                inputFechaFin.disabled = true;
+                inputFechaFin.required = false;
+                inputFechaFin.value = '';
+            } else {
+                inputFechaFin.disabled = false;
+                inputFechaFin.required = true;
+                // Restaurar fecha por defecto si está vacía? O dejar que usuario ponga.
+                if(!inputFechaFin.value) {
+                     // Fecha de mañana como placeholder? O +1 mes
+                     // Mejor no tocar si ya tenía algo, o poner hoy
+                }
+            }
+        });
+    }
+
     window.abrirModalCrear = function() {
         if (!modal) return;
         document.getElementById('formEncuesta').reset();
+        document.getElementById('encuestaId').value = 0;
+        document.getElementById('formEncuesta').action = 'index.php?System=encuestas&a=guardar';
+        document.querySelector('.modal-title').textContent = 'Nueva Encuesta';
+        
+        // Reset manual
+        if(checkSinLimite) {
+            checkSinLimite.checked = false;
+            checkSinLimite.dispatchEvent(new Event('change'));
+        }
+        
         modal.show();
     };
 
-    // Auto submit simple (el controller redirige)
-    // Opcional: Agregar loading state al boton
+    window.abrirModalEditar = function(data) {
+        if (!modal) return;
+        document.getElementById('formEncuesta').reset();
+        
+        document.getElementById('encuestaId').value = data.id;
+        document.getElementById('formEncuesta').action = 'index.php?System=encuestas&a=actualizar'; // AJAX handling separate if needed, but form submit works for finding controller method if route logic supports it? controller expects POST to 'actualizar'
+        // Wait, routing is ?System=encuestas&a=... 
+        
+        document.querySelector('input[name="titulo"]').value = data.titulo;
+        document.querySelector('input[name="tiempo_estimado"]').value = data.tiempo_estimado;
+        document.querySelector('input[name="fecha_inicio"]').value = data.fecha_inicio;
+        
+        const fFin = document.getElementById('fechaFin');
+        if (data.fecha_fin) {
+             fFin.value = data.fecha_fin;
+             checkSinLimite.checked = false;
+        } else {
+             checkSinLimite.checked = true;
+        }
+        checkSinLimite.dispatchEvent(new Event('change'));
+
+        // Anonima?
+        if (data.anonima == 1) {
+             document.getElementById('tipoAnon').checked = true;
+        } else {
+             document.getElementById('tipoReg').checked = true;
+        }
+
+        document.querySelector('.modal-title').textContent = 'Editar Configuración';
+        
+        // Image Preview
+        const previewContainer = document.getElementById('preview-container');
+        const imgPreview = document.getElementById('img-preview');
+        const fileInput = document.querySelector('input[name="imagen_header"]');
+        fileInput.value = ''; // Reset file input
+
+        if (data.imagen_header) {
+            previewContainer.classList.remove('d-none');
+            imgPreview.src = data.imagen_header;
+        } else {
+            previewContainer.classList.add('d-none');
+            imgPreview.src = '';
+        }
+
+        modal.show();
+    };
+
+    // Auto submit logic update needed for AJAX if using 'actualizar' which returns JSON
     const form = document.getElementById('formEncuesta');
     if(form) {
-        form.addEventListener('submit', function() {
-             const btn = this.querySelector('button[type="submit"]');
-             if(btn) {
-                 btn.disabled = true;
-                 btn.innerHTML = 'Creando...';
+        form.addEventListener('submit', function(e) {
+             const action = this.action;
+             if(action.includes('actualizar')) {
+                 e.preventDefault();
+                 const formData = new FormData(this);
+                 
+                 fetch(action, {
+                     method: 'POST',
+                     body: formData
+                 })
+                 .then(res => res.json())
+                 .then(data => {
+                     if(data.success) {
+                         location.reload();
+                     } else {
+                         alert(data.message);
+                     }
+                 })
+                 .catch(err => alert('Error al procesar'));
+             } else {
+                 // Creating uses standard post redirect
+                 const btn = this.querySelector('button[type="submit"]');
+                 if(btn) {
+                     btn.disabled = true;
+                     btn.innerHTML = 'Procesando...';
+                 }
              }
         });
     }

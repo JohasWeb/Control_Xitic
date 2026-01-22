@@ -49,13 +49,13 @@ class EncuestasModel
         }
     }
 
-    public function crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $CreadoPor, $Anonima = 0, $TiempoEstimado = 5)
+    public function crearEncuesta($ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $CreadoPor, $Anonima = 0, $TiempoEstimado = 5, $ImagenHeader = null)
     {
         try {
             $Sql = "INSERT INTO encuestas 
-                    (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, estado, creado_por, anonima, tiempo_estimado) 
+                    (cliente_id, titulo, descripcion, fecha_inicio, fecha_fin, estado, creado_por, anonima, tiempo_estimado, imagen_header) 
                     VALUES 
-                    (:cliente_id, :titulo, :descripcion, :inicio, :fin, 1, :creado_por, :anonima, :tiempo_estimado)";
+                    (:cliente_id, :titulo, :descripcion, :inicio, :fin, 1, :creado_por, :anonima, :tiempo_estimado, :img)";
             
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':cliente_id', $ClienteId, PDO::PARAM_INT);
@@ -66,11 +66,45 @@ class EncuestasModel
             $Stmt->bindValue(':creado_por', $CreadoPor, PDO::PARAM_INT);
             $Stmt->bindValue(':anonima', $Anonima, PDO::PARAM_INT);
             $Stmt->bindValue(':tiempo_estimado', $TiempoEstimado, PDO::PARAM_INT);
+            $Stmt->bindValue(':img', $ImagenHeader);
 
             if ($Stmt->execute()) {
                 return $this->pdo->lastInsertId();
             }
             return false;
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    public function actualizarEncuesta($Id, $ClienteId, $Titulo, $Descripcion, $FechaInicio, $FechaFin, $Anonima, $TiempoEstimado, $ImagenHeader = null)
+    {
+        try {
+            $SetImg = "";
+            if ($ImagenHeader !== null) {
+                $SetImg = ", imagen_header = :img";
+            }
+
+            $Sql = "UPDATE encuestas 
+                    SET titulo = :titulo, descripcion = :descripcion, fecha_inicio = :inicio, 
+                        fecha_fin = :fin, anonima = :anonima, tiempo_estimado = :tiempo_estimado
+                        $SetImg
+                    WHERE id = :id AND cliente_id = :cliente_id";
+            
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':titulo', $Titulo);
+            $Stmt->bindValue(':descripcion', $Descripcion);
+            $Stmt->bindValue(':inicio', $FechaInicio);
+            $Stmt->bindValue(':fin', $FechaFin);
+            $Stmt->bindValue(':anonima', $Anonima, PDO::PARAM_INT);
+            $Stmt->bindValue(':tiempo_estimado', $TiempoEstimado, PDO::PARAM_INT);
+            if ($ImagenHeader !== null) {
+                $Stmt->bindValue(':img', $ImagenHeader);
+            }
+            $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
+            $Stmt->bindValue(':cliente_id', $ClienteId, PDO::PARAM_INT);
+
+            return $Stmt->execute();
         } catch (Exception $e) {
             return false;
         }
@@ -91,13 +125,13 @@ class EncuestasModel
         }
     }
 
-    public function agregarPregunta($EncuestaId, $Texto, $Tipo, $Orden, $Requerido, $OpcionesJson)
+    public function agregarPregunta($EncuestaId, $Texto, $Tipo, $Orden, $Requerido, $OpcionesJson, $Logica = null, $Config = null)
     {
         try {
             $Sql = "INSERT INTO encuestas_preguntas 
-                    (encuesta_id, texto_pregunta, tipo_pregunta, orden, requerido, opciones_json)
+                    (encuesta_id, texto_pregunta, tipo_pregunta, orden, requerido, opciones_json, logica_condicional, configuracion_json)
                     VALUES 
-                    (:encuesta_id, :texto, :tipo, :orden, :requerido, :opciones)";
+                    (:encuesta_id, :texto, :tipo, :orden, :requerido, :opciones, :logica, :config)";
 
             $Stmt = $this->pdo->prepare($Sql);
             $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
@@ -106,7 +140,66 @@ class EncuestasModel
             $Stmt->bindValue(':orden', $Orden, PDO::PARAM_INT);
             $Stmt->bindValue(':requerido', $Requerido, PDO::PARAM_INT);
             $Stmt->bindValue(':opciones', $OpcionesJson);
+            $Stmt->bindValue(':logica', $Logica);
+            $Stmt->bindValue(':config', $Config);
 
+            return $Stmt->execute();
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    public function actualizarPregunta($Id, $EncuestaId, $Texto, $Tipo, $Requerido, $OpcionesJson, $Logica = null, $Config = null)
+    {
+        try {
+            $Sql = "UPDATE encuestas_preguntas 
+                    SET texto_pregunta = :texto, tipo_pregunta = :tipo, requerido = :requerido, 
+                        opciones_json = :opciones, logica_condicional = :logica, configuracion_json = :config
+                    WHERE id = :id AND encuesta_id = :encuesta_id";
+
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':texto', $Texto);
+            $Stmt->bindValue(':tipo', $Tipo);
+            $Stmt->bindValue(':requerido', $Requerido, PDO::PARAM_INT);
+            $Stmt->bindValue(':opciones', $OpcionesJson);
+            $Stmt->bindValue(':logica', $Logica);
+            $Stmt->bindValue(':config', $Config);
+            $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
+            $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
+
+            return $Stmt->execute();
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+
+    public function reordenarPreguntas($Items)
+    {
+        try {
+            $this->pdo->beginTransaction();
+            $Sql = "UPDATE encuestas_preguntas SET orden = :orden WHERE id = :id";
+            $Stmt = $this->pdo->prepare($Sql);
+
+            foreach ($Items as $Item) {
+                $Stmt->bindValue(':orden', $Item['orden'], PDO::PARAM_INT);
+                $Stmt->bindValue(':id', $Item['id'], PDO::PARAM_INT);
+                $Stmt->execute();
+            }
+            $this->pdo->commit();
+            return true;
+        } catch (Exception $e) {
+            $this->pdo->rollBack();
+            return false;
+        }
+    }
+
+    public function eliminarPregunta($Id, $EncuestaId)
+    {
+        try {
+            $Sql = "DELETE FROM encuestas_preguntas WHERE id = :id AND encuesta_id = :encuesta_id";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $Id, PDO::PARAM_INT);
+            $Stmt->bindValue(':encuesta_id', $EncuestaId, PDO::PARAM_INT);
             return $Stmt->execute();
         } catch (Exception $e) {
             return false;
