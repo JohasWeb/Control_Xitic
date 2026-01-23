@@ -521,7 +521,10 @@ $CurrentTheme = $ThemesMap[$Theme] ?? $ThemesMap['light'];
 
 <!-- SCRIPTS -->
 <script>
+    let startTime = Date.now();
+
     document.addEventListener('DOMContentLoaded', function() {
+        startTime = Date.now();
         initLogic();
         
         // Animacion entrada
@@ -638,6 +641,10 @@ $CurrentTheme = $ThemesMap[$Theme] ?? $ThemesMap['light'];
 
         const form = document.getElementById('publicSurveyForm');
         const formData = new FormData(form);
+        
+        // Calculate Duration
+        const duration = Math.round((Date.now() - startTime) / 1000);
+        formData.append('duracion_segundos', duration);
 
         fetch('index.php?System=encuestas&a=guardar_respuesta_publica', {
             method: 'POST',

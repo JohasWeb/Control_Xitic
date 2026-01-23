@@ -32,14 +32,15 @@ $Csrf = SecurityController::obtenerCsrfToken();
                         <th class="ps-4 py-3 text-uppercase text-muted extra-small fw-bold">Título</th>
                         <th class="py-3 text-uppercase text-muted extra-small fw-bold" style="width: 100px;">Imagen</th>
                         <th class="py-3 text-uppercase text-muted extra-small fw-bold">Fechas</th>
+                        <th class="py-3 text-uppercase text-muted extra-small fw-bold text-center">Respuestas</th>
                         <th class="py-3 text-uppercase text-muted extra-small fw-bold">Configuración</th>
-                        <th class="py-3 text-uppercase text-muted extra-small fw-bold">Acciones</th>
+                        <th class="py-3 text-uppercase text-muted extra-small fw-bold text-end pe-4">Acciones</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($Encuestas)): ?>
                         <tr>
-                            <td colspan="5" class="text-center py-5">
+                            <td colspan="6" class="text-center py-5">
                                 <span class="text-muted">No tienes encuestas registradas.</span>
                             </td>
                         </tr>
@@ -74,6 +75,23 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                             echo 'Sin límite';
                                         }
                                         ?>
+                                    </div>
+                                </td>
+                                <td class="py-3 align-middle text-center">
+                                    <div class="vstack gap-1">
+                                        <span class="badge bg-white text-dark border px-3 py-2 rounded-pill shadow-sm">
+                                            <i class="bi bi-people-fill text-primary me-1"></i> 
+                                            <?= $E['total_respuestas'] ?>
+                                        </span>
+                                        <?php if($E['total_respuestas'] > 0): 
+                                            $avg = round($E['promedio_duracion']);
+                                            $min = floor($avg / 60);
+                                            $sec = $avg % 60;
+                                        ?>
+                                            <span class="extra-small text-muted" title="Tiempo promedio">
+                                                <i class="bi bi-clock me-1"></i><?= $min ?>m <?= $sec ?>s
+                                            </span>
+                                        <?php endif; ?>
                                     </div>
                                 </td>
                                 <td class="py-3 align-middle">

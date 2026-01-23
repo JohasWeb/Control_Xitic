@@ -47,7 +47,9 @@ class EncuestasModel
     public function listarEncuestas(?int $ClienteId = null): array
     {
         try {
-            $Sql = "SELECT e.*, c.nombre_comercial as cliente_nombre 
+            $Sql = "SELECT e.*, c.nombre_comercial as cliente_nombre,
+                    (SELECT COUNT(*) FROM encuestas_respuestas r WHERE r.encuesta_id = e.id) as total_respuestas,
+                    (SELECT AVG(duracion_segundos) FROM encuestas_respuestas r2 WHERE r2.encuesta_id = e.id) as promedio_duracion
                     FROM encuestas e
                     JOIN clientes c ON e.cliente_id = c.id";
             
@@ -613,19 +615,20 @@ class EncuestasModel
      * @param array $Comentarios Array [pregunta_id => texto]
      * @return bool
      */
-    public function guardarRespuesta(int $EncuestaId, int $SucursalId, array $Respuestas, array $Comentarios = []): bool
+    public function guardarRespuesta(int $EncuestaId, int $SucursalId, array $Respuestas, array $Comentarios = [], int $Duracion = 0): bool
     {
         try {
             $this->pdo->beginTransaction();
 
             // 1. Guardar Cabecera
-            $SqlHead = "INSERT INTO encuestas_respuestas (encuesta_id, sucursal_id, ip_cliente, user_agent) 
-                        VALUES (:encuesta, :sucursal, :ip, :ua)";
+            $SqlHead = "INSERT INTO encuestas_respuestas (encuesta_id, sucursal_id, ip_cliente, user_agent, duracion_segundos) 
+                        VALUES (:encuesta, :sucursal, :ip, :ua, :dur)";
             $StmtHead = $this->pdo->prepare($SqlHead);
             $StmtHead->bindValue(':encuesta', $EncuestaId, PDO::PARAM_INT);
             $StmtHead->bindValue(':sucursal', $SucursalId, PDO::PARAM_INT);
             $StmtHead->bindValue(':ip', $_SERVER['REMOTE_ADDR'] ?? null);
             $StmtHead->bindValue(':ua', $_SERVER['HTTP_USER_AGENT'] ?? null);
+            $StmtHead->bindValue(':dur', $Duracion, PDO::PARAM_INT);
             $StmtHead->execute();
             
             $RespuestaId = $this->pdo->lastInsertId();

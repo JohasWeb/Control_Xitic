@@ -761,13 +761,14 @@ class EncuestasController
             }
 
             $Respuestas = $_POST['resp'] ?? [];
-            $Comentarios = $_POST['comentarios'] ?? []; // Nuevo campo para comentarios
+            $Comentarios = $_POST['comentarios'] ?? [];
+            $Duracion = isset($_POST['duracion_segundos']) ? (int)$_POST['duracion_segundos'] : 0;
 
             if (empty($Respuestas)) {
                 throw new Exception('No hay respuestas para guardar');
             }
 
-            $Exito = $this->model->guardarRespuesta($EncuestaId, $SucursalId, $Respuestas, $Comentarios);
+            $Exito = $this->model->guardarRespuesta($EncuestaId, $SucursalId, $Respuestas, $Comentarios, $Duracion);
             
             if ($Exito) {
                 echo json_encode(['success' => true]);
