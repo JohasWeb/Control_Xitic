@@ -469,6 +469,27 @@ class EncuestasController
     }
 
     /**
+     * Vista pública de agradecimiento.
+     * 
+     * @return void
+     */
+    public function agradecimiento(): void
+    {
+        $Id = 0;
+        if (isset($_GET['id'])) {
+            $Id = (int)$_GET['id'];
+        }
+        
+        $Encuesta = $this->model->obtenerEncuesta($Id);
+        
+        if (!$Encuesta) {
+            die("Encuesta no encontrada.");
+        }
+        
+        include_once "View/Public/Encuestas/agradecimiento.php";
+    }
+
+    /**
      * Guarda (crea o actualiza) una pregunta vía AJAX.
      * 
      * @return void
@@ -551,12 +572,18 @@ class EncuestasController
                 // Configuración adicional
                 $Logica = null;
                 if (isset($_POST['logica_condicional'])) {
-                    $Logica = $_POST['logica_condicional'];
+                    $RawLogica = trim($_POST['logica_condicional']);
+                    if ($RawLogica !== '' && $RawLogica !== 'null') {
+                         $Logica = $RawLogica;
+                    }
                 }
 
                 $Config = null;
                 if (isset($_POST['configuracion_json'])) {
-                    $Config = $_POST['configuracion_json'];
+                    $RawConfig = trim($_POST['configuracion_json']);
+                    if ($RawConfig !== '' && $RawConfig !== 'null') {
+                        $Config = $RawConfig;
+                    }
                 }
 
                 $Res = false;

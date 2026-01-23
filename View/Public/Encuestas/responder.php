@@ -646,19 +646,9 @@ $CurrentTheme = $ThemesMap[$Theme] ?? $ThemesMap['light'];
         .then(response => response.json())
         .then(data => {
             if(data.success) {
-                document.querySelector('.survey-card').innerHTML = `
-                    <div class="text-center py-5">
-                        <div class="mb-4">
-                            <span class="d-inline-flex align-items-center justify-content-center rounded-circle bg-success text-white" style="width:80px;height:80px;box-shadow:0 10px 20px rgba(22,163,74,0.3)">
-                                <i class="bi bi-check-lg" style="font-size: 2.5rem;"></i>
-                            </span>
-                        </div>
-                        <h2 class="fw-bold mb-2">¡Gracias!</h2>
-                        <p class="text-muted mb-4">Tus respuestas han sido registradas correctamente.</p>
-                        <button onclick="location.reload()" class="btn btn-outline-dark rounded-pill px-4 btn-sm">Nueva Respuesta</button>
-                    </div>
-                `;
-                window.scrollTo(0,0);
+                // Redirigir a vista de agradecimiento
+                const encId = formData.get('encuesta_id');
+                window.location.href = `index.php?System=encuestas&a=agradecimiento&id=${encId}`;
             } else {
                 alert('Error: ' + data.message);
                 btn.disabled = false;

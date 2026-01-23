@@ -12,12 +12,7 @@ class DataBase
             return $pdo;
              
         } catch (Exception $e) {
-            return null;
-           
-            echo $e->getMessage();
-            return null;
- 
-            exit();
+            die("Database Construction Error: " . $e->getMessage());
         }
     }
 

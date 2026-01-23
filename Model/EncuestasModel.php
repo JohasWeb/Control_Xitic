@@ -68,7 +68,7 @@ class EncuestasModel
             return $Stmt->fetchAll(PDO::FETCH_ASSOC);
 
         } catch (Exception $e) {
-            return array();
+            throw $e;
         }
     }
 
@@ -89,7 +89,7 @@ class EncuestasModel
             return $Stmt->fetch(PDO::FETCH_ASSOC);
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -144,7 +144,7 @@ class EncuestasModel
             return false;
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -207,7 +207,7 @@ class EncuestasModel
             return $Stmt->execute();
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -228,7 +228,7 @@ class EncuestasModel
             $Stmt->execute();
             return $Stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (Exception $e) {
-            return [];
+            throw $e;
         }
     }
 
@@ -246,7 +246,7 @@ class EncuestasModel
             $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
             return $Stmt->execute();
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -268,7 +268,7 @@ class EncuestasModel
             $Stmt->bindValue(':valor', $ValorId, PDO::PARAM_INT);
             return $Stmt->execute();
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -371,7 +371,7 @@ class EncuestasModel
                 return $Stmt->fetchAll(PDO::FETCH_ASSOC);
             }
         } catch (Exception $e) {
-            return [];
+            throw $e;
         }
 
         return [];
@@ -396,7 +396,7 @@ class EncuestasModel
             return $Stmt->fetchAll(PDO::FETCH_ASSOC);
 
         } catch (Exception $e) {
-            return array();
+            throw $e;
         }
     }
 
@@ -502,7 +502,7 @@ class EncuestasModel
             return true;
         } catch (Exception $e) {
             $this->pdo->rollBack();
-            return false;
+            throw $e;
         }
     }
 
@@ -524,7 +524,7 @@ class EncuestasModel
             return $Stmt->execute();
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -544,7 +544,7 @@ class EncuestasModel
             return $Stmt->execute();
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -569,7 +569,7 @@ class EncuestasModel
             return $Stmt->fetch(PDO::FETCH_ASSOC);
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
 
@@ -599,7 +599,7 @@ class EncuestasModel
             return false;
 
         } catch (Exception $e) {
-            return false;
+            throw $e;
         }
     }
     // --- RESPUESTAS ---
@@ -619,7 +619,7 @@ class EncuestasModel
             $this->pdo->beginTransaction();
 
             // 1. Guardar Cabecera
-            $SqlHead = "INSERT INTO encuestas_respuestas (encuesta_id, sucursal_id, ip_address, user_agent) 
+            $SqlHead = "INSERT INTO encuestas_respuestas (encuesta_id, sucursal_id, ip_cliente, user_agent) 
                         VALUES (:encuesta, :sucursal, :ip, :ua)";
             $StmtHead = $this->pdo->prepare($SqlHead);
             $StmtHead->bindValue(':encuesta', $EncuestaId, PDO::PARAM_INT);
@@ -631,8 +631,10 @@ class EncuestasModel
             $RespuestaId = $this->pdo->lastInsertId();
 
             // 2. Guardar Detalles
-            $SqlDet = "INSERT INTO encuestas_respuestas_detalles (respuesta_id, pregunta_id, respuesta, comentario) 
-                       VALUES (:resp_id, :preg_id, :val, :comment)";
+            // Nota: Se valida que exista la columna 'comentario' vía migración
+            $SqlDet = "INSERT INTO encuestas_respuestas_detalle (respuesta_id, pregunta_id, valor_respuesta, comentario) 
+                       VALUES (:resp_id, :preg_id, :val, :comment)"; 
+            
             $StmtDet = $this->pdo->prepare($SqlDet);
 
             foreach ($Respuestas as $PreguntaId => $Valor) {
@@ -645,8 +647,9 @@ class EncuestasModel
 
                 $StmtDet->bindValue(':resp_id', $RespuestaId, PDO::PARAM_INT);
                 $StmtDet->bindValue(':preg_id', $PreguntaId, PDO::PARAM_INT);
-                $StmtDet->bindValue(':val', $Valor);
+                $StmtDet->bindValue(':val', $Valor); 
                 $StmtDet->bindValue(':comment', $Comentario);
+                
                 $StmtDet->execute();
             }
 
@@ -655,7 +658,7 @@ class EncuestasModel
 
         } catch (Exception $e) {
             $this->pdo->rollBack();
-            return false;
+            throw $e;
         }
     }
 }
