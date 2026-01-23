@@ -46,6 +46,20 @@ $CsrfToken = SecurityController::obtenerCsrfToken();
                         <input type="number" class="form-control bg-light border-0" name="limite_sucursales" min="0" value="<?php echo (int)$Cliente['limite_sucursales']; ?>">
                         <div class="form-text extra-small">0 = Ilimitadas.</div>
                     </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-primary">Módulos Activos</label>
+                        <div class="d-flex gap-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="modEnc" name="modulo_encuestas" value="1" <?php echo (!empty($Cliente['modulo_encuestas']) && $Cliente['modulo_encuestas'] == 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label small" for="modEnc">Encuestas</label>
+                            </div>
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="modCas" name="modulo_casos" value="1" <?php echo (!empty($Cliente['modulo_casos']) && $Cliente['modulo_casos'] == 1) ? 'checked' : ''; ?>>
+                                <label class="form-check-label small" for="modCas">Casos IA</label>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="modal-footer border-0 pt-0">
@@ -90,7 +104,21 @@ $CsrfToken = SecurityController::obtenerCsrfToken();
                 </div>
             </div>
             
-            <div class="ms-auto">
+            <div class="ms-auto d-flex gap-2">
+                <!-- Toggle Activo -->
+                <?php if ($Cliente['activo'] == 1): ?>
+                    <a href="index.php?System=clientes&a=toggle_activo&id=<?php echo $Cliente['id']; ?>&estado=1" 
+                       class="btn btn-outline-danger btn-sm rounded-pill px-3"
+                       onclick="return confirm('¿Seguro que deseas desactivar este cliente? No podrán acceder al sistema.')">
+                        <i class="bi bi-power me-1"></i>Desactivar
+                    </a>
+                <?php else: ?>
+                    <a href="index.php?System=clientes&a=toggle_activo&id=<?php echo $Cliente['id']; ?>&estado=0" 
+                       class="btn btn-outline-success btn-sm rounded-pill px-3">
+                        <i class="bi bi-power me-1"></i>Activar
+                    </a>
+                <?php endif; ?>
+
                 <button type="button" class="btn btn-outline-primary btn-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEditarCliente">
                     <i class="bi bi-pencil me-1"></i>Editar
                 </button>
@@ -127,6 +155,28 @@ $CsrfToken = SecurityController::obtenerCsrfToken();
                     </label>
                     <div class="fs-5 fw-bold <?php echo ($Cliente['limite_sucursales'] > 0) ? 'text-danger' : 'text-success'; ?>">
                         <?php echo ($Cliente['limite_sucursales'] > 0) ? $Cliente['limite_sucursales'] : 'Ilimitadas'; ?>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="d-block text-muted extra-small fw-bold mb-2">Módulos Habilitados</label>
+                    <div class="d-flex flex-column gap-2 bg-light p-3 rounded">
+                        <div class="form-check form-switch d-flex align-items-center gap-2">
+                             <input class="form-check-input toggle-module cursor-pointer" type="checkbox" role="switch" id="switchEnc"
+                                    data-id="<?php echo $Cliente['id']; ?>" data-mod="modulo_encuestas"
+                                    <?php echo ($Cliente['modulo_encuestas'] == 1) ? 'checked' : ''; ?>>
+                             <label class="form-check-label small fw-bold text-dark cursor-pointer" for="switchEnc">
+                                <i class="bi bi-ui-checks-grid me-1 text-primary"></i>Encuestas
+                             </label>
+                        </div>
+                        <div class="form-check form-switch d-flex align-items-center gap-2">
+                             <input class="form-check-input toggle-module cursor-pointer" type="checkbox" role="switch" id="switchCas"
+                                    data-id="<?php echo $Cliente['id']; ?>" data-mod="modulo_casos"
+                                    <?php echo ($Cliente['modulo_casos'] == 1) ? 'checked' : ''; ?>>
+                             <label class="form-check-label small fw-bold text-dark cursor-pointer" for="switchCas">
+                                <i class="bi bi-robot me-1 text-indigo"></i>Casos con IA
+                             </label>
+                        </div>
                     </div>
                 </div>
 
@@ -176,6 +226,39 @@ $CsrfToken = SecurityController::obtenerCsrfToken();
                 </div>
             </div>
 
+            <!-- Card: Configuración IA -->
+            <div class="soft-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="bg-indigo-subtle text-indigo rounded-circle d-flex align-items-center justify-content-center" style="width:32px;height:32px;">
+                            <i class="bi bi-robot small"></i>
+                        </div>
+                        <div>
+                             <h6 class="text-uppercase text-muted extra-small fw-bold mb-0 ls-1">Prompt para Casos IA</h6>
+                             <?php if (!empty($Cliente['config_ia_token'])): ?>
+                                <span class="badge bg-success-subtle text-success extra-small border border-success-subtle"><i class="bi bi-check-circle me-1"></i>Token Configurado</span>
+                             <?php else: ?>
+                                <span class="badge bg-warning-subtle text-warning extra-small border border-warning-subtle"><i class="bi bi-exclamation-triangle me-1"></i>Sin Token</span>
+                             <?php endif; ?>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-light border text-primary rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#modalEditarIA">
+                        <i class="bi bi-pencil me-1"></i>Editar
+                    </button>
+                </div>
+                
+                <div class="bg-light p-3 rounded border" style="max-height: 200px; overflow-y: auto;">
+                    <?php if (!empty($Cliente['config_ia_prompt'])): ?>
+                        <pre class="mb-0 text-muted small" style="white-space: pre-wrap; font-family: inherit;"><?php echo htmlspecialchars($Cliente['config_ia_prompt']); ?></pre>
+                    <?php else: ?>
+                        <div class="text-center py-4 text-muted opacity-50">
+                            <i class="bi bi-chat-square-quote fs-1 mb-2 d-block"></i>
+                            <span class="small">No se ha definido un Prompt de Sistema.</span>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            </div>
+
             <!-- Aquí se podría agregar una tabla rápida de usuarios si se quisiera expandir -->
             <div class="soft-card p-4 text-center text-muted">
                 <i class="bi bi-cone-striped fs-1 d-block mb-3 opacity-50"></i>
@@ -185,12 +268,73 @@ $CsrfToken = SecurityController::obtenerCsrfToken();
     </div>
 </div>
 
+<!-- MODAL EDITOR IA -->
+<div class="modal fade" id="modalEditarIA" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg" style="border-radius:1rem;">
+            <div class="modal-header border-0 pb-0">
+                <h5 class="modal-title fw-bold">Configuración IA</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form action="index.php?System=clientes&a=guardar" method="POST">
+                <input type="hidden" name="csrf_token" value="<?php echo $CsrfToken; ?>">
+                <input type="hidden" name="id" value="<?php echo $Cliente['id']; ?>">
+                
+                <!-- Mantener datos requeridos que no cambian aquí -->
+                <input type="hidden" name="nombre_comercial" value="<?php echo htmlspecialchars($Cliente['nombre_comercial']); ?>">
+                <input type="hidden" name="admin_nombre" value="N/A">
+                <input type="hidden" name="email_admin" value="placeholder@xitic.com">
+                <!-- Mantener otros campos para no borrarlos al guardar (o el backend debe manejar nulls con cuidado, pero el backend actualiza todo) -->
+                <!-- Mejor opción: Enviar solo ID y Prompt si el backend lo soportara parcialmente, pero 'actualizar' pide todo. 
+                     Truco: Enviamos hidden con los valores actuales del cliente -->
+                <input type="hidden" name="razon_social" value="<?php echo htmlspecialchars($Cliente['razon_social']); ?>">
+                <input type="hidden" name="comentarios" value="<?php echo htmlspecialchars($Cliente['comentarios']); ?>">
+                <input type="hidden" name="limite_sucursales" value="<?php echo htmlspecialchars($Cliente['limite_sucursales']); ?>">
+                <input type="hidden" name="modulo_encuestas" value="<?php echo $Cliente['modulo_encuestas']; ?>">
+                <input type="hidden" name="modulo_casos" value="<?php echo $Cliente['modulo_casos']; ?>">
+
+                <div class="modal-body pt-4">
+                    <div class="alert alert-light border d-flex gap-2 mb-3">
+                         <i class="bi bi-shield-lock-fill text-muted mt-1"></i>
+                         <div class="small text-muted line-height-sm">
+                             La información proporcionada aquí se utilizará para configurar el comportamiento del asistente de IA exclusivo para este cliente.
+                         </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold text-dark small">OpenAI API Token</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0"><i class="bi bi-key"></i></span>
+                            <input type="password" class="form-control bg-light border-0" name="config_ia_token" placeholder="sk-..." value="<?php echo htmlspecialchars($Cliente['config_ia_token'] ?? ''); ?>">
+                        </div>
+                        <div class="form-text extra-small">Introduce la clave API de OpenAI. Se guardará de forma segura.</div>
+                    </div>
+
+
+
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-indigo small">Prompt para Casos IA</label>
+                        <p class="extra-small text-muted mb-2">Instrucciones del sistema para el análisis de casos.</p>
+                        <textarea class="form-control bg-light border-0 p-3 shadow-inner" name="config_ia_prompt" rows="12" placeholder="Eres un asistente experto en atención al cliente..." style="resize: vertical; font-family: monospace; font-size: 0.9rem;"><?php echo htmlspecialchars($Cliente['config_ia_prompt'] ?? ''); ?></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer border-0 pt-0">
+                     <button type="button" class="btn btn-link text-muted text-decoration-none small" data-bs-dismiss="modal">Cancelar</button>
+                     <button type="submit" class="btn btn-primary rounded-pill px-4" style="background:var(--accent);border:none;">Guardar Prompt</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const form = document.querySelector('#modalEditarCliente form');
-    if(form) {
+    // Selector para ambos formularios
+    const forms = document.querySelectorAll('#modalEditarCliente form, #modalEditarIA form');
+    
+    forms.forEach(form => {
         form.addEventListener('submit', function(e) {
             e.preventDefault();
             const btn = form.querySelector('button[type="submit"]');
@@ -218,7 +362,40 @@ document.addEventListener('DOMContentLoaded', function() {
                 btn.innerHTML = originalText;
             });
         });
-    }
+    });
+
+    // Toggle Modulos AJAX
+    document.querySelectorAll('.toggle-module').forEach(toggle => {
+        toggle.addEventListener('change', function() {
+            const id = this.dataset.id;
+            const modulo = this.dataset.mod;
+            const estado = this.checked ? 1 : 0;
+            const self = this;
+
+            // Deshabilitar temporalmente
+            self.disabled = true;
+
+            fetch('index.php?System=clientes&a=toggle_modulo', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: id, modulo: modulo, estado: estado })
+            })
+            .then(res => res.json())
+            .then(data => {
+                self.disabled = false;
+                if(!data.success) {
+                    alert('Error al actualizar módulo: ' + (data.message || 'Desconocido'));
+                    self.checked = !self.checked; // Revertir
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                alert('Error de red');
+                self.disabled = false;
+                self.checked = !self.checked;
+            });
+        });
+    });
 });
 </script>
 

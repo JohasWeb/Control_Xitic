@@ -125,6 +125,13 @@ $Csrf = SecurityController::obtenerCsrfToken();
                                 </td>
                                 <td class="py-3 text-end pe-4">
                                     <div class="d-flex gap-2 justify-content-end">
+                                        <!-- Botón Resultados -->
+                                        <a href="index.php?System=encuestas&a=resultados&id=<?= $E['id'] ?>" 
+                                           class="btn btn-sm btn-light border text-success" 
+                                           title="Ver Resultados">
+                                            <i class="bi bi-bar-chart-fill"></i>
+                                        </a>
+
                                         <!-- Botón Editar ahora apunta a Configuración -->
                                         <a href="index.php?System=encuestas&a=configuracion&id=<?= $E['id'] ?>" 
                                            class="btn btn-sm btn-light border text-primary" 

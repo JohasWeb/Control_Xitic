@@ -101,6 +101,14 @@ class ClientesController
         
         // Limite Sucursales
         $LimiteSucursales = isset($_POST['limite_sucursales']) ? (int)$_POST['limite_sucursales'] : 0;
+        
+        // Módulos (Checkboxes)
+        $ModuloEncuestas = isset($_POST['modulo_encuestas']) ? 1 : 0;
+        $ModuloCasos = isset($_POST['modulo_casos']) ? 1 : 0;
+        
+        // IA Prompt & Token
+        $ConfigIaPrompt = isset($_POST['config_ia_prompt']) ? trim($_POST['config_ia_prompt']) : null;
+        $ConfigIaToken = isset($_POST['config_ia_token']) ? trim($_POST['config_ia_token']) : null;
 
         // Validación
         if ($Nombre === '' || $AdminNombre === '' || $EmailAdmin === '') {
@@ -110,7 +118,7 @@ class ClientesController
         try {
             if ($Id > 0) {
                 // Edición
-                $Resultado = $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl, $LimiteSucursales);
+                $Resultado = $this->model->actualizar($Id, $Nombre, $Razon, $Comentarios, $LogoUrl, $LimiteSucursales, $ModuloEncuestas, $ModuloCasos, $ConfigIaPrompt, $ConfigIaToken);
                 
                 if ($Resultado) {
                     echo json_encode(['success' => true, 'message' => 'Cliente actualizado correctamente']);
@@ -120,7 +128,7 @@ class ClientesController
                 exit;
             } else {
                 // Creación
-                $NuevoClienteId = $this->model->crear($Nombre, $Razon, $Comentarios, $LogoUrl, $LimiteSucursales);
+                $NuevoClienteId = $this->model->crear($Nombre, $Razon, $Comentarios, $LogoUrl, $LimiteSucursales, $ModuloEncuestas, $ModuloCasos, $ConfigIaPrompt, $ConfigIaToken);
 
                 if (!$NuevoClienteId) {
                     throw new Exception("No se pudo registrar el cliente en la base de datos.");
@@ -162,6 +170,54 @@ class ClientesController
         } catch (Exception $e) {
             echo json_encode(['success' => false, 'message' => 'Error al procesar: ' . $e->getMessage()]);
             exit;
+        }
+    }
+
+    public function toggle_activo()
+    {
+        SecurityController::iniciarSesionSegura();
+        SecurityController::exigirAdminMaster();
+
+        $Id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
+        $Estado = isset($_GET['estado']) ? (int)$_GET['estado'] : 0; // Estado ACTUAL
+
+        if ($Id > 0) {
+            $this->model->toggleActivo($Id, $Estado);
+        }
+        
+        // Redirigir de vuelta (referer o a la ficha)
+        header("Location: index.php?System=clientes&a=ver&id=$Id");
+        exit;
+    }
+
+    public function toggle_modulo()
+    {
+        // Limpiar buffer
+        while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/json');
+
+        SecurityController::iniciarSesionSegura();
+        SecurityController::exigirAdminMaster();
+
+        try {
+            $Data = json_decode(file_get_contents('php://input'), true);
+            $Id = isset($Data['id']) ? (int)$Data['id'] : 0;
+            $Modulo = isset($Data['modulo']) ? $Data['modulo'] : '';
+            $Estado = isset($Data['estado']) ? (int)$Data['estado'] : 0;
+
+            if ($Id <= 0 || !in_array($Modulo, ['modulo_encuestas', 'modulo_casos'])) {
+                 echo json_encode(['success' => false, 'message' => 'Datos inválidos']);
+                 exit;
+            }
+
+            if ($this->model->toggleModulo($Id, $Modulo, $Estado)) {
+                echo json_encode(['success' => true]);
+            } else {
+                echo json_encode(['success' => false, 'message' => 'Error al actualizar BD']);
+            }
+
+        } catch (Exception $e) {
+            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
         }
     }
 }

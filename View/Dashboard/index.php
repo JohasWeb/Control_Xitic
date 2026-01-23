@@ -15,6 +15,36 @@ if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1) 
         </div>
     </div>
 
+    <!-- Stats Row (AdminMaster) -->
+    <?php if (isset($StatsAdmin) && !empty($StatsAdmin)): ?>
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm text-center">
+                <div class="card-body">
+                    <h1 class="display-5 fw-bold text-primary mb-0"><?php echo number_format($StatsAdmin['clientes_activos']); ?></h1>
+                    <span class="text-muted small text-uppercase fw-bold">Clientes Activos</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm text-center">
+                <div class="card-body">
+                    <h1 class="display-5 fw-bold text-success mb-0"><?php echo number_format($StatsAdmin['encuestas_activas']); ?></h1>
+                    <span class="text-muted small text-uppercase fw-bold">Encuestas Activas</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-0 shadow-sm text-center">
+                <div class="card-body">
+                    <h1 class="display-5 fw-bold text-info mb-0"><?php echo number_format($StatsAdmin['respuestas_totales']); ?></h1>
+                    <span class="text-muted small text-uppercase fw-bold">Respuestas Totales</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <?php endif; ?>
+
     <div class="row g-4">
         <!-- Tarjeta de Clientes (Solo visible para AdminMaster) -->
         <?php if (isset($_SESSION['_Es_AdminMaster']) && $_SESSION['_Es_AdminMaster'] === 1): ?>

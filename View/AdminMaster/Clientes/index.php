@@ -145,6 +145,20 @@ $Csrf = SecurityController::obtenerCsrfToken();
                             <input type="number" class="form-control bg-light border-0" name="limite_sucursales" value="1" min="0">
                             <div class="form-text extra-small">Introduce 0 para sucursales ilimitadas. (Default: 1)</div>
                         </div>
+
+                        <div class="col-12 mt-3">
+                            <label class="form-label small fw-bold text-primary">Módulos Iniciales</label>
+                            <div class="d-flex gap-4">
+                                <div class="form-check form-switch cursor-pointer">
+                                    <input class="form-check-input" type="checkbox" id="newModEnc" name="modulo_encuestas" value="1" checked>
+                                    <label class="form-check-label small user-select-none" for="newModEnc">Encuestas</label>
+                                </div>
+                                <div class="form-check form-switch cursor-pointer">
+                                    <input class="form-check-input" type="checkbox" id="newModCas" name="modulo_casos" value="1">
+                                    <label class="form-check-label small user-select-none" for="newModCas">Casos IA</label>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <hr class="border-light my-4">

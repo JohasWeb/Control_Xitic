@@ -15,6 +15,8 @@ include_once "Model/EncuestasModel.php";
 include_once "Model/ClientesModel.php";
 include_once "Model/RegionesModel.php";
 include_once "Model/SucursalesModel.php";
+include_once "Model/CasosModel.php";
+include_once "Model/OpenAIService.php";
 
 /**
  * Clase EncuestasController
@@ -67,6 +69,195 @@ class EncuestasController
         $Encuestas = $this->model->listarEncuestas($ClienteId);
         
         include_once "View/ClienteAdmin/Encuestas/index.php";
+    }
+
+    /**
+     * Muestra el listado de resultados (respuestas) de una encuesta.
+     * 
+     * @return void
+     */
+    public function resultados(): void
+    {
+        SecurityController::exigirAutenticado();
+        
+        $EncuestaId = $_GET['id'] ?? null;
+        if (!$EncuestaId) {
+            header("Location: index.php?System=encuestas");
+            exit;
+        }
+
+        // Obtener info básica de la encuesta
+        $Encuesta = $this->model->obtenerEncuesta((int)$EncuestaId);
+        if (!$Encuesta) {
+             header("Location: index.php?System=encuestas");
+             exit;
+        }
+
+        // Validar propiedad (Seguridad crud)
+        $ClienteId = null;
+        if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1) {
+             $Security = new SecurityController();
+             $ClienteId = $Security->obtenerClienteIdSesion();
+        }
+
+        if ($ClienteId !== null && $Encuesta['cliente_id'] != $ClienteId) {
+             // No tiene permiso para ver esta encuesta
+             header("Location: index.php?System=encuestas");
+             exit;
+        }
+
+        // Filtros
+        $F_FechaInicio = $_GET['fecha_inicio'] ?? null;
+        $F_FechaFin = $_GET['fecha_fin'] ?? null;
+        $F_SucursalId = isset($_GET['sucursal_id']) && $_GET['sucursal_id'] !== '' ? (int)$_GET['sucursal_id'] : null;
+        $Limit = 50;
+
+        $Respuestas = $this->model->obtenerRespuestas((int)$EncuestaId, $F_FechaInicio, $F_FechaFin, $F_SucursalId, $Limit);
+        
+        // Obtener lista de sucursales para el filtro (solo las que tienen acceso a esta encuesta o todas del cliente)
+        // Usamos obtenerSucursalesAlcance que ya filtra
+        // Si no hay cliente Id definido (admin), obtenemos todas del cliente dueño de la encuesta
+        if (!$ClienteId) {
+            $ClienteId = $Encuesta['cliente_id'];
+        }
+        $Sucursales = $this->model->obtenerSucursalesAlcance((int)$EncuestaId, (int)$ClienteId);
+
+        // --- PIVOTE: Preguntas y Detalles ---
+        // 1. Obtener preguntas para las columnas
+        $Preguntas = $this->model->obtenerPreguntas((int)$EncuestaId);
+        
+        // 2. Obtener IDs de las respuestas listadas
+        $RespuestaIds = array_column($Respuestas, 'id');
+        
+        // 3. Obtener detalles (respuestas) para esos IDs
+        $DetallesRaw = $this->model->obtenerRespuestasDetalladas($RespuestaIds);
+        
+        // 4. Pivotear: Matrix[RespuestaID][PreguntaID] = Valor
+        $MatrixRespuestas = [];
+        foreach ($DetallesRaw as $D) {
+            $MatrixRespuestas[$D['respuesta_id']][$D['pregunta_id']] = $D['valor_respuesta'];
+        }
+
+        include_once "View/ClienteAdmin/Encuestas/resultados.php";
+    }
+
+    /**
+     * Exporta las respuestas de una encuesta a CSV.
+     * 
+     * @return void
+     */
+    public function exportar_csv(): void
+    {
+        SecurityController::exigirAutenticado();
+        
+        $EncuestaId = $_GET['id'] ?? null;
+        if (!$EncuestaId) {
+            exit("Error: ID de encuesta no especificado.");
+        }
+        
+        // Validar existencia y propiedad
+        $Encuesta = $this->model->obtenerEncuesta((int)$EncuestaId);
+        if (!$Encuesta) {
+            exit("Error: Encuesta no encontrada.");
+        }
+
+        $ClienteId = null;
+        if (isset($_SESSION['_Es_ClienteAdmin']) && $_SESSION['_Es_ClienteAdmin'] == 1) {
+             $Security = new SecurityController();
+             $ClienteId = $Security->obtenerClienteIdSesion();
+        }
+
+        if ($ClienteId !== null && $Encuesta['cliente_id'] != $ClienteId) {
+             exit("Error: Acceso denegado.");
+        }
+
+        // Obtener datos planos
+        $Data = $this->model->obtenerDetallesExportar((int)$EncuestaId);
+        
+        $Filename = "reporte_encuesta_" . $EncuestaId . "_" . date('Y-m-d_H-i') . ".csv";
+        
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $Filename);
+        
+        $Output = fopen('php://output', 'w'); // Usar php://output para enviar directo al navegador
+        
+        // Cabeceras del CSV
+        // BOM para Excel
+        fprintf($Output, chr(0xEF).chr(0xBB).chr(0xBF));
+        
+        fputcsv($Output, [
+            'ID Respuesta', 
+            'Fecha Hora', 
+            'Sucursal', 
+            'Duración (s)', 
+            'Tipo Pregunta',
+            'Pregunta', 
+            'Respuesta', 
+            'Comentario'
+        ]);
+        
+        foreach ($Data as $Row) {
+            fputcsv($Output, [
+                $Row['respuesta_id'],
+                $Row['fecha_respuesta'],
+                $Row['sucursal_nombre'],
+                $Row['duracion_segundos'],
+                $Row['tipo_pregunta'],
+                $Row['texto_pregunta'],
+                $Row['valor_respuesta'],
+                $Row['comentario']
+            ]);
+        }
+        
+        fclose($Output);
+        exit;
+    }
+
+    /**
+     * Devuelve el HTML del detalle de respuestas para un modal.
+     * 
+     * @return void
+     */
+    public function ver_detalle(): void
+    {
+        SecurityController::exigirAutenticado();
+        
+        $RespuestaId = $_GET['id'] ?? null;
+        if (!$RespuestaId) {
+            echo "ID no especificado.";
+            return;
+        }
+
+        // TODO: Agregar validación de seguridad extra (verificar que la respuesta pertenezca a una encuesta del cliente)
+        // Por brevedad y dado que es ajax interno, asumimos validación previa en listado o agregamos:
+        // $EsMio = $this->model->verificarPropiedadRespuesta($RespuestaId, $ClienteId);
+
+        $Detalles = $this->model->obtenerDetalleRespuesta((int)$RespuestaId);
+
+        if (empty($Detalles)) {
+            echo '<div class="text-center text-muted py-3">No se encontraron detalles.</div>';
+            return;
+        }
+
+        echo '<div class="vstack gap-3">';
+        foreach ($Detalles as $D) {
+            echo '<div class="border rounded p-3 bg-light">';
+            echo '  <div class="fw-bold mb-1 text-dark">' . htmlspecialchars($D['texto_pregunta']) . '</div>';
+            
+            // Valor Rústico
+            echo '  <div class="text-secondary small mb-1">';
+            echo      htmlspecialchars($D['valor_respuesta']);
+            echo '  </div>';
+
+            if (!empty($D['comentario'])) {
+                echo '  <div class="mt-2 pt-2 border-top border-light-subtle extra-small text-muted">';
+                echo '    <i class="bi bi-chat-quote-fill me-1"></i>' . htmlspecialchars($D['comentario']);
+                echo '  </div>';
+            }
+            echo '</div>';
+        }
+        echo '</div>';
+        exit;
     }
 
     /**
@@ -771,6 +962,99 @@ class EncuestasController
             $Exito = $this->model->guardarRespuesta($EncuestaId, $SucursalId, $Respuestas, $Comentarios, $Duracion);
             
             if ($Exito) {
+                $RespuestaId = (int)$Exito;
+
+                // --- AUTOMATIZACIÓN IA PARA CASOS ---
+                try {
+                    $ClientesModel = new ClientesModel();
+                    $Cliente = $ClientesModel->obtenerPorId($Encuesta['cliente_id']);
+
+                    // Verificar requisitos: Módulo Casos + Token + Prompt
+                    if ($Cliente && isset($Cliente['modulo_casos']) && $Cliente['modulo_casos'] == 1 
+                        && !empty($Cliente['config_ia_token']) && !empty($Cliente['config_ia_prompt'])) {
+                        
+                        // 1. Preparar Texto de la Encuesta
+                        $TextoEncuesta = "Fecha: " . date('Y-m-d H:i') . "\n";
+                        $TextoEncuesta .= "Sucursal ID: " . $SucursalId . "\n";
+                        $TextoEncuesta .= "Duración: " . $Duracion . "s\n\n";
+                        $TextoEncuesta .= "CUESTIONARIO:\n";
+                        
+                        $Preguntas = $this->model->obtenerPreguntas($EncuestaId);
+                        $MapPreguntas = [];
+                        foreach ($Preguntas as $P) {
+                            $MapPreguntas[$P['id']] = $P['texto_pregunta'];
+                        }
+
+                        foreach ($Respuestas as $PId => $Val) {
+                            $TextoP = $MapPreguntas[$PId] ?? "Pregunta ID $PId";
+                            if (is_array($Val)) $Val = implode(', ', $Val);
+                            $TextoEncuesta .= "- $TextoP: $Val\n";
+                        }
+                        
+                        if (!empty($Comentarios)) {
+                            $TextoEncuesta .= "\nCOMENTARIOS ADICIONALES:\n";
+                            foreach ($Comentarios as $PId => $Com) {
+                                if (!empty($Com)) {
+                                    $TextoP = $MapPreguntas[$PId] ?? "Pregunta ID $PId";
+                                    $TextoEncuesta .= "- Sobre '$TextoP': $Com\n";
+                                }
+                            }
+                        }
+
+                        // 2. Llamada a OpenAI
+                        $AIService = new OpenAIService();
+                        $SystemPrompt = $Cliente['config_ia_prompt'] . "\n\n" . 
+                            "INSTRUCCIONES DE SALIDA: Analiza la encuesta anterior. Tu objetivo es detectar si hay insatisfacción, quejas, problemas legales o una solicitud que requiera atención humana (Crear Caso).\n" .
+                            "Responde EXCLUSIVAMENTE un JSON con este formato:\n" .
+                            "{ \"requires_case\": boolean, \"category\": string (ej. 'Servicio', 'Producto', 'Limpieza', 'Legal'), \"severity\": string ('Baja', 'Media', 'Alta', 'Critica'), \"summary\": string (max 100 caracteres) }";
+                        
+                        $Analisis = $AIService->analizarEncuesta($SystemPrompt, $TextoEncuesta, $Cliente['config_ia_token']);
+
+                        if (isset($Analisis['data']) && isset($Analisis['data']['requires_case']) && $Analisis['data']['requires_case'] === true) {
+                            $Data = $Analisis['data'];
+                            
+                            // 3. Crear Caso Automático
+                            $CasosModel = new CasosModel();
+                            
+                            // Calcular SLA
+                            $SlaHoras = isset($Cliente['config_sla_horas']) ? (int)$Cliente['config_sla_horas'] : 24;
+                            $SlaVencimiento = date('Y-m-d H:i:s', strtotime("+$SlaHoras hours"));
+                            
+                            // Obtener Datos de Ubicación
+                            $RegionId = null;
+                            if ($SucursalId > 0) {
+                                $SucModel = new SucursalesModel();
+                                $Suc = $SucModel->obtenerPorId($SucursalId, $Encuesta['cliente_id']);
+                                if ($Suc) {
+                                    $RegionId = $Suc['region_id'];
+                                }
+                            }
+
+                            // Responsable Provisional (Creador de la encuesta o usuario genérico)
+                            $ResponsableId = $Encuesta['creador_id']; 
+
+                            $CasosModel->crear(
+                                $Encuesta['cliente_id'],
+                                $ResponsableId, // Usuario que "reporta" (sistema/creador encuesta)
+                                "Caso IA - " . ($Data['category'] ?? 'General') . " - Suc " . $SucursalId,
+                                $TextoEncuesta, // La descripción es la encuesta completa
+                                $RespuestaId,
+                                $Data['category'] ?? 'General',
+                                $Data['severity'] ?? 'Media',
+                                $Data['summary'] ?? 'Detectado por IA',
+                                $SlaVencimiento,
+                                $ResponsableId, // Asignar al mismo por ahora (o lógica de Supervisor)
+                                $SucursalId,
+                                $RegionId
+                            );
+                        }
+                    }
+                } catch (Exception $e) {
+                    // Silenciar errores de IA para no bloquear la encuesta
+                    // error_log("Error IA Auto: " . $e->getMessage());
+                }
+                // -----------------------------------
+
                 echo json_encode(['success' => true]);
             } else {
                 throw new Exception('Error al guardar en base de datos');

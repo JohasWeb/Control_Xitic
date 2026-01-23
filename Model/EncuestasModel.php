@@ -613,9 +613,9 @@ class EncuestasModel
      * @param int $SucursalId
      * @param array $Respuestas Array [pregunta_id => valor]
      * @param array $Comentarios Array [pregunta_id => texto]
-     * @return bool
+     * @return int ID de la respuesta o 0 si falla
      */
-    public function guardarRespuesta(int $EncuestaId, int $SucursalId, array $Respuestas, array $Comentarios = [], int $Duracion = 0): bool
+    public function guardarRespuesta(int $EncuestaId, int $SucursalId, array $Respuestas, array $Comentarios = [], int $Duracion = 0): int
     {
         try {
             $this->pdo->beginTransaction();
@@ -657,11 +657,175 @@ class EncuestasModel
             }
 
             $this->pdo->commit();
-            return true;
+            return (int)$RespuestaId;
 
         } catch (Exception $e) {
             $this->pdo->rollBack();
             throw $e;
+        }
+    }
+
+    /**
+     * Obtiene el listado de respuestas (cabeceras) para una encuesta.
+     * 
+     * @param int $EncuestaId
+     * @return array
+     */
+    public function obtenerRespuestas(int $EncuestaId, ?string $FechaInicio = null, ?string $FechaFin = null, ?int $SucursalId = null, int $Limit = 50): array
+    {
+        try {
+            $Sql = "SELECT r.*, s.nombre as sucursal_nombre
+                    FROM encuestas_respuestas r
+                    LEFT JOIN sucursales s ON r.sucursal_id = s.id
+                    WHERE r.encuesta_id = :id";
+            
+            if ($FechaInicio) {
+                $Sql .= " AND DATE(r.fecha_respuesta) >= :f_ini";
+            }
+            if ($FechaFin) {
+                $Sql .= " AND DATE(r.fecha_respuesta) <= :f_fin";
+            }
+            if ($SucursalId) {
+                $Sql .= " AND r.sucursal_id = :suc_id";
+            }
+
+            $Sql .= " ORDER BY r.fecha_respuesta DESC LIMIT :limit";
+
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
+            
+            if ($FechaInicio) {
+                $Stmt->bindValue(':f_ini', $FechaInicio);
+            }
+            if ($FechaFin) {
+                $Stmt->bindValue(':f_fin', $FechaFin);
+            }
+            if ($SucursalId) {
+                $Stmt->bindValue(':suc_id', $SucursalId, PDO::PARAM_INT);
+            }
+            
+            $Stmt->bindValue(':limit', $Limit, PDO::PARAM_INT);
+            
+            $Stmt->execute();
+            return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Obtiene el detalle completo de respuestas para exportación.
+     * 
+     * @param int $EncuestaId
+     * @return array
+     */
+    public function obtenerDetallesExportar(int $EncuestaId): array
+    {
+        try {
+            $Sql = "SELECT 
+                        r.id as respuesta_id,
+                        r.fecha_respuesta,
+                        r.duracion_segundos,
+                        s.nombre as sucursal_nombre,
+                        p.id as pregunta_id,
+                        p.texto_pregunta,
+                        p.tipo_pregunta,
+                        d.valor_respuesta,
+                        d.comentario
+                    FROM encuestas_respuestas r
+                    JOIN encuestas_respuestas_detalle d ON r.id = d.respuesta_id
+                    JOIN encuestas_preguntas p ON d.pregunta_id = p.id
+                    LEFT JOIN sucursales s ON r.sucursal_id = s.id
+                    WHERE r.encuesta_id = :id
+                    ORDER BY r.id DESC, p.orden ASC";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $EncuestaId, PDO::PARAM_INT);
+            $Stmt->execute();
+            return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+
+
+    /**
+     * Obtiene el detalle de una respuesta específica.
+     * 
+     * @param int $RespuestaId
+     * @return array
+     */
+    public function obtenerDetalleRespuesta(int $RespuestaId): array
+    {
+        try {
+            $Sql = "SELECT 
+                        p.texto_pregunta,
+                        p.tipo_pregunta,
+                        d.valor_respuesta,
+                        d.comentario
+                    FROM encuestas_respuestas_detalle d
+                    JOIN encuestas_preguntas p ON d.pregunta_id = p.id
+                    WHERE d.respuesta_id = :id
+                    ORDER BY p.orden ASC";
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->bindValue(':id', $RespuestaId, PDO::PARAM_INT);
+            $Stmt->execute();
+            return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    /**
+     * Obtiene todas las respuestas detalladas para un conjunto de IDs de respuestas.
+     * Útil para vistas pivoteadas.
+     * 
+     * @param array $RespuestaIds
+     * @return array [respuesta_id => [pregunta_id => valor]] (Estructura plana para iteración)
+     */
+    public function obtenerRespuestasDetalladas(array $RespuestaIds): array
+    {
+        if (empty($RespuestaIds)) return [];
+
+        try {
+            $Placeholders = implode(',', array_fill(0, count($RespuestaIds), '?'));
+            
+            // Traemos solo lo necesario para mapear
+            $Sql = "SELECT respuesta_id, pregunta_id, valor_respuesta 
+                    FROM encuestas_respuestas_detalle 
+                    WHERE respuesta_id IN ($Placeholders)";
+            
+            $Stmt = $this->pdo->prepare($Sql);
+            $Stmt->execute($RespuestaIds);
+            
+            return $Stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+
+    // --- ADMIN MASTER STATS ---
+
+    public function obtenerTotalEncuestasActivas()
+    {
+        try {
+            $Sql = "SELECT COUNT(*) FROM encuestas WHERE activo = 1";
+            $Stmt = $this->pdo->query($Sql);
+            return $Stmt->fetchColumn();
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+
+    public function obtenerTotalRespuestasGlobal()
+    {
+        try {
+            $Sql = "SELECT COUNT(*) FROM encuestas_respuestas";
+            $Stmt = $this->pdo->query($Sql);
+            return $Stmt->fetchColumn();
+        } catch (Exception $e) {
+            return 0;
         }
     }
 }

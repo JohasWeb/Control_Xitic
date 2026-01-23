@@ -8,6 +8,14 @@ include_once "Controller/SecurityController.php";
 $Csrf_token_header = (string) SecurityController::obtenerCsrfToken();
 
 include_once "View/layouts/session_vars.php";
+include_once "Model/ClientesModel.php";
+
+// Obtener configuración del cliente para el menú
+$HeaderClienteModel = new ClientesModel();
+$HeaderSecurity = new SecurityController();
+$HeaderClienteId = $HeaderSecurity->obtenerClienteIdSesion();
+$HeaderClienteData = $HeaderClienteModel->obtenerPorId($HeaderClienteId);
+$MostrarCasos = ($HeaderClienteData && isset($HeaderClienteData['modulo_casos']) && $HeaderClienteData['modulo_casos'] == 1);
 
 $Usuario_mostrar = '';
 if (isset($_SESSION["_Nombre_Sesion"])) {
@@ -32,7 +40,7 @@ if (!empty($Usuario_mostrar)) {
  * Rutas del menú
  */
 $Ruta_inicio = 'index.php?System=dashboard&a=index';
-$Ruta_reportes = 'index.php?System=reportes&a=index';
+$Ruta_reportes = 'index.php?System=encuestas';
 $Ruta_encuestas = 'index.php?System=encuestas&a=index';
 $Ruta_casos = 'index.php?System=casos&a=index';
 $Ruta_sucursales = 'index.php?System=sucursales&a=index';
@@ -222,19 +230,19 @@ if (!function_exists('isActive')) {
             <i class="bi bi-grid-fill"></i> Dashboard
           </a>
         </li>
-        <li class="nav-item">
           <a class="nav-link <?= isActive($System_actual, 'encuestas') ?>" href="<?= $Ruta_encuestas ?>">
             <i class="bi bi-clipboard-data-fill"></i> Encuestas
           </a>
         </li>
+        
+        <?php if ($MostrarCasos): ?>
         <li class="nav-item">
-            <span class="nav-link disabled text-muted opacity-25 px-1 py-0 d-none d-lg-block">|</span>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link <?= isActive($System_actual, 'reportes') ?>" href="<?= $Ruta_reportes ?>">
-            <i class="bi bi-bar-chart-line-fill"></i> Reportes
+          <a class="nav-link <?= isActive($System_actual, 'casos') ?>" href="<?= $Ruta_casos ?>">
+            <i class="bi bi-chat-square-text-fill"></i> Casos
           </a>
         </li>
+        <?php endif; ?>
+
         <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle <?= in_array($System_actual, ['sucursales', 'regiones', 'usuarios']) ? 'active' : '' ?>" href="#" role="button" data-bs-toggle="dropdown">
             <i class="bi bi-gear-fill"></i> Configuración
